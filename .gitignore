@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+#.vscode
+.vscode/
+
+#ROS2 build directories
+build/
+install/
+log/
