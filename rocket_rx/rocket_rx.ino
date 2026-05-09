@@ -1,12 +1,9 @@
-
-#include "simba_headers/simba/mavlink_msg_simba_gps.h"
-#include "simba_headers/simba_radio/mavlink_msg_radio_status.h"
+#include "simba_headers/simba/mavlink.h"
 
 #include <RadioLib.h>
 #include <SPI.h>
 
-// #define DEBUG    // bez ROS2
-
+ #define DEBUG   
 
 #define LORA_NSS   41
 #define LORA_SCK   7
@@ -17,9 +14,8 @@
 #define LORA_DIO1  39
 #define LORA_SW1   38
 
-
 #define MAV_SYS_ID        1
-#define MAV_COMP_INT_GPS  1   // compid=1: GPS wbudowany w moduł LoRa
+#define MAV_COMP_INT_GPS  1   // compid=1: GPS wbudowany 
 #define MAV_COMP_MAV_GPS  2   // compid=2: GPS z komputera pokładowego
 
 
@@ -32,17 +28,20 @@ struct __attribute__((packed)) RocketPacket {
   int32_t  mav_lon;
   float    mav_alt;   
 
-  uint8_t  status;    
+  uint8_t  status;   
   uint8_t  _pad;
   uint16_t checksum;  
 };
 static_assert(sizeof(RocketPacket) == 28, "Zly rozmiar RocketPacket!");
 
+// --- OBIEKTY ---
 SPIClass spiLora(HSPI);
 SX1262   radio = new Module(LORA_NSS, LORA_DIO1, LORA_RESET, LORA_BUSY, spiLora);
 
 static uint8_t  mavSeq   = 0;
 static uint16_t rxErrors = 0;
+
+
 
 uint16_t crc16(const uint8_t *data, size_t len) {
   uint16_t crc = 0xFFFF;
@@ -54,7 +53,6 @@ uint16_t crc16(const uint8_t *data, size_t len) {
   }
   return crc;
 }
-
 
 void sendSimbaGps(uint8_t compid, int32_t lat, int32_t lon, float alt_m) {
   mavlink_message_t msg;
@@ -71,7 +69,6 @@ void sendSimbaGps(uint8_t compid, int32_t lat, int32_t lon, float alt_m) {
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   Serial.write(buf, len);
 }
-
 
 void sendRadioStatus(float rssi_dbm, float snr_db) {
   mavlink_message_t msg;
@@ -138,7 +135,6 @@ void loop() {
   float rssi = radio.getRSSI();
   float snr  = radio.getSNR();
 
-  // Weryfikacja CRC
   uint16_t expected = crc16((const uint8_t *)&pkt,
                              sizeof(RocketPacket) - sizeof(uint16_t));
   if (expected != pkt.checksum) {
@@ -147,7 +143,7 @@ void loop() {
     Serial.printf("[CRC ERR] oczekiwano=0x%04X dostano=0x%04X err#%u\n",
                   expected, pkt.checksum, rxErrors);
 #endif
-    sendRadioStatus(rssi, snr);  
+    sendRadioStatus(rssi, snr);  // powiadom ROS2 o złym pakiecie
     return;
   }
 
@@ -161,11 +157,14 @@ void loop() {
                   pkt.mav_lat/1e7, pkt.mav_lon/1e7, pkt.mav_alt);
 #endif
 
+  //  GPS wbudowany
   if (pkt.status & 0x01)
     sendSimbaGps(MAV_COMP_INT_GPS, pkt.int_lat, pkt.int_lon, pkt.int_alt);
 
+  // GPS komputera pokładowego
   if (pkt.status & 0x02)
     sendSimbaGps(MAV_COMP_MAV_GPS, pkt.mav_lat, pkt.mav_lon, pkt.mav_alt);
 
+  // Status łącza 
   sendRadioStatus(rssi, snr);
 }

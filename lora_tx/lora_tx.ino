@@ -1,10 +1,4 @@
-// ============================================================
-//  ROCKET TELEMETRY — Nadajnik 
-//  Dwa źródła GPS - jeden pakiet LoRa co 2s
-//
-//  MAVLink: dialekt SIMBA, MSG ID 72 (SIMBA_GPS)
-//  Pakiet: 22 bajty (bez paddingu, packed)
-// ============================================================
+
 #include <RadioLib.h>
 #include <SPI.h>
 #include <TinyGPS++.h>
@@ -42,9 +36,9 @@
 //   26       2      checksum       CRC-16/CCITT
 //  = 28 bajtów łącznie
 //
-//  Mapa bitów 'status':
+//  'status':
 //    Bit 0 (0x01) — wbudowany GPS: fix valid
-//    Bit 1 (0x02) — SIMBA GPS:     wiadomość odebrana w tym cyklu
+//    Bit 1 (0x02) — SIMBA GPS: 
 // ----------------------------------------------------------------
 struct __attribute__((packed)) RocketPacket {
   int32_t  int_lat;
@@ -93,7 +87,7 @@ uint16_t crc16(const uint8_t *data, size_t len) {
 void setup() {
   Serial.begin(115200);
 
-  static_assert(sizeof(RocketPacket) == 28, "Zly rozmiar RocketPacket!");
+  static_assert(sizeof(RocketPacket) == 28, "Zly rozmiar");
   Serial.printf("[INIT] sizeof(RocketPacket) = %u bajtow\n", sizeof(RocketPacket));
 
   Serial1.begin(9600, SERIAL_8N1, GPS_INT_RX, GPS_INT_TX);
@@ -106,7 +100,7 @@ void setup() {
   digitalWrite(LORA_SW1, HIGH);
   spiLora.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_NSS);
 
-  // 920 MHz | BW 125 kHz | SF10 | CR 4/5 | 22 dBm | preambuła 8
+  // 920 MHz | BW 125 kHz | SF10 | CR 4/5 | 22 dBm 
   // SF10/125kHz/28B = 330 ms
   int state = radio.begin(920.0, 125.0, 10, 5,
                           RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8);
