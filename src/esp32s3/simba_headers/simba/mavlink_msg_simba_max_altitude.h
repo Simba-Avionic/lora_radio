@@ -5,7 +5,7 @@
 
 
 typedef struct __mavlink_simba_max_altitude_t {
- int32_t altitude; /*<  Altitude (scaled) [cm]*/
+ int32_t altitude; /*<   Altitude (scaled) [cm] */
 } mavlink_simba_max_altitude_t;
 
 #define MAVLINK_MSG_ID_SIMBA_MAX_ALTITUDE_LEN 4
@@ -41,7 +41,7 @@ typedef struct __mavlink_simba_max_altitude_t {
  * @param component_id ID of this component (e.g. 200 for IMU)
  * @param msg The MAVLink message to compress the data into
  *
- * @param altitude  Altitude (scaled) [cm]
+ * @param altitude   Altitude (scaled) [cm] 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_max_altitude_pack(uint8_t system_id, uint8_t component_id, mavlink_message_t* msg,
@@ -70,7 +70,7 @@ static inline uint16_t mavlink_msg_simba_max_altitude_pack(uint8_t system_id, ui
  * @param status MAVLink status structure
  * @param msg The MAVLink message to compress the data into
  *
- * @param altitude  Altitude (scaled) [cm]
+ * @param altitude   Altitude (scaled) [cm] 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_max_altitude_pack_status(uint8_t system_id, uint8_t component_id, mavlink_status_t *_status, mavlink_message_t* msg,
@@ -102,7 +102,7 @@ static inline uint16_t mavlink_msg_simba_max_altitude_pack_status(uint8_t system
  * @param component_id ID of this component (e.g. 200 for IMU)
  * @param chan The MAVLink channel this message will be sent over
  * @param msg The MAVLink message to compress the data into
- * @param altitude  Altitude (scaled) [cm]
+ * @param altitude   Altitude (scaled) [cm] 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_max_altitude_pack_chan(uint8_t system_id, uint8_t component_id, uint8_t chan,
@@ -170,7 +170,7 @@ static inline uint16_t mavlink_msg_simba_max_altitude_encode_status(uint8_t syst
  * @brief Send a simba_max_altitude message
  * @param chan MAVLink channel to send the message
  *
- * @param altitude  Altitude (scaled) [cm]
+ * @param altitude   Altitude (scaled) [cm] 
  */
 #ifdef MAVLINK_USE_CONVENIENCE_FUNCTIONS
 
@@ -235,7 +235,7 @@ static inline void mavlink_msg_simba_max_altitude_send_buf(mavlink_message_t *ms
 /**
  * @brief Get field altitude from simba_max_altitude message
  *
- * @return  Altitude (scaled) [cm]
+ * @return   Altitude (scaled) [cm] 
  */
 static inline int32_t mavlink_msg_simba_max_altitude_get_altitude(const mavlink_message_t* msg)
 {

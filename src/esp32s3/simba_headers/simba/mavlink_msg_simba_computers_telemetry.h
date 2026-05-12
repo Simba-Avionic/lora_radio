@@ -5,41 +5,48 @@
 
 
 typedef struct __mavlink_simba_computers_telemetry_t {
- uint8_t mb_cpu_usage; /*<  Main Computer CPU usage (0-100%)*/
- uint8_t mb_memory_usage; /*<  Main Computer Memory usage (0-100%)*/
- uint8_t eb_cpu_usage; /*<  Engine Computer CPU usage (0-100%)*/
- uint8_t eb_memory_usage; /*<  Engine Computer Memory usage (0-100%)*/
+ uint8_t mb_cpu_usage; /*<   Main Computer CPU usage (0-100%)*/
+ uint8_t mb_memory_usage; /*<   Main Computer Memory usage (0-100%)*/
+ uint8_t eb_cpu_usage; /*<   Engine Computer CPU usage (0-100%)*/
+ uint8_t eb_memory_usage; /*<   Engine Computer Memory usage (0-100%)*/
+ uint8_t mb_temperature[3]; /*<   Main Computer Board Temperature (0-128*C)*/
+ uint8_t eb_temperature[3]; /*<   Egine Computer Board Temperature (0-128*C) */
 } mavlink_simba_computers_telemetry_t;
 
-#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN 4
-#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN 4
-#define MAVLINK_MSG_ID_77_LEN 4
-#define MAVLINK_MSG_ID_77_MIN_LEN 4
+#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN 10
+#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN 10
+#define MAVLINK_MSG_ID_77_LEN 10
+#define MAVLINK_MSG_ID_77_MIN_LEN 10
 
-#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC 207
-#define MAVLINK_MSG_ID_77_CRC 207
+#define MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC 7
+#define MAVLINK_MSG_ID_77_CRC 7
 
-
+#define MAVLINK_MSG_SIMBA_COMPUTERS_TELEMETRY_FIELD_MB_TEMPERATURE_LEN 3
+#define MAVLINK_MSG_SIMBA_COMPUTERS_TELEMETRY_FIELD_EB_TEMPERATURE_LEN 3
 
 #if MAVLINK_COMMAND_24BIT
 #define MAVLINK_MESSAGE_INFO_SIMBA_COMPUTERS_TELEMETRY { \
     77, \
     "SIMBA_COMPUTERS_TELEMETRY", \
-    4, \
+    6, \
     {  { "mb_cpu_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 0, offsetof(mavlink_simba_computers_telemetry_t, mb_cpu_usage) }, \
          { "mb_memory_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 1, offsetof(mavlink_simba_computers_telemetry_t, mb_memory_usage) }, \
          { "eb_cpu_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 2, offsetof(mavlink_simba_computers_telemetry_t, eb_cpu_usage) }, \
          { "eb_memory_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 3, offsetof(mavlink_simba_computers_telemetry_t, eb_memory_usage) }, \
+         { "mb_temperature", NULL, MAVLINK_TYPE_UINT8_T, 3, 4, offsetof(mavlink_simba_computers_telemetry_t, mb_temperature) }, \
+         { "eb_temperature", NULL, MAVLINK_TYPE_UINT8_T, 3, 7, offsetof(mavlink_simba_computers_telemetry_t, eb_temperature) }, \
          } \
 }
 #else
 #define MAVLINK_MESSAGE_INFO_SIMBA_COMPUTERS_TELEMETRY { \
     "SIMBA_COMPUTERS_TELEMETRY", \
-    4, \
+    6, \
     {  { "mb_cpu_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 0, offsetof(mavlink_simba_computers_telemetry_t, mb_cpu_usage) }, \
          { "mb_memory_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 1, offsetof(mavlink_simba_computers_telemetry_t, mb_memory_usage) }, \
          { "eb_cpu_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 2, offsetof(mavlink_simba_computers_telemetry_t, eb_cpu_usage) }, \
          { "eb_memory_usage", NULL, MAVLINK_TYPE_UINT8_T, 0, 3, offsetof(mavlink_simba_computers_telemetry_t, eb_memory_usage) }, \
+         { "mb_temperature", NULL, MAVLINK_TYPE_UINT8_T, 3, 4, offsetof(mavlink_simba_computers_telemetry_t, mb_temperature) }, \
+         { "eb_temperature", NULL, MAVLINK_TYPE_UINT8_T, 3, 7, offsetof(mavlink_simba_computers_telemetry_t, eb_temperature) }, \
          } \
 }
 #endif
@@ -50,14 +57,16 @@ typedef struct __mavlink_simba_computers_telemetry_t {
  * @param component_id ID of this component (e.g. 200 for IMU)
  * @param msg The MAVLink message to compress the data into
  *
- * @param mb_cpu_usage  Main Computer CPU usage (0-100%)
- * @param mb_memory_usage  Main Computer Memory usage (0-100%)
- * @param eb_cpu_usage  Engine Computer CPU usage (0-100%)
- * @param eb_memory_usage  Engine Computer Memory usage (0-100%)
+ * @param mb_cpu_usage   Main Computer CPU usage (0-100%)
+ * @param mb_memory_usage   Main Computer Memory usage (0-100%)
+ * @param eb_cpu_usage   Engine Computer CPU usage (0-100%)
+ * @param eb_memory_usage   Engine Computer Memory usage (0-100%)
+ * @param mb_temperature   Main Computer Board Temperature (0-128*C)
+ * @param eb_temperature   Egine Computer Board Temperature (0-128*C) 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_pack(uint8_t system_id, uint8_t component_id, mavlink_message_t* msg,
-                               uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage)
+                               uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage, const uint8_t *mb_temperature, const uint8_t *eb_temperature)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
     char buf[MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN];
@@ -65,7 +74,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack(uint8_t system
     _mav_put_uint8_t(buf, 1, mb_memory_usage);
     _mav_put_uint8_t(buf, 2, eb_cpu_usage);
     _mav_put_uint8_t(buf, 3, eb_memory_usage);
-
+    _mav_put_uint8_t_array(buf, 4, mb_temperature, 3);
+    _mav_put_uint8_t_array(buf, 7, eb_temperature, 3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), buf, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #else
     mavlink_simba_computers_telemetry_t packet;
@@ -73,7 +83,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack(uint8_t system
     packet.mb_memory_usage = mb_memory_usage;
     packet.eb_cpu_usage = eb_cpu_usage;
     packet.eb_memory_usage = eb_memory_usage;
-
+    mav_array_memcpy(packet.mb_temperature, mb_temperature, sizeof(uint8_t)*3);
+    mav_array_memcpy(packet.eb_temperature, eb_temperature, sizeof(uint8_t)*3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), &packet, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #endif
 
@@ -88,14 +99,16 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack(uint8_t system
  * @param status MAVLink status structure
  * @param msg The MAVLink message to compress the data into
  *
- * @param mb_cpu_usage  Main Computer CPU usage (0-100%)
- * @param mb_memory_usage  Main Computer Memory usage (0-100%)
- * @param eb_cpu_usage  Engine Computer CPU usage (0-100%)
- * @param eb_memory_usage  Engine Computer Memory usage (0-100%)
+ * @param mb_cpu_usage   Main Computer CPU usage (0-100%)
+ * @param mb_memory_usage   Main Computer Memory usage (0-100%)
+ * @param eb_cpu_usage   Engine Computer CPU usage (0-100%)
+ * @param eb_memory_usage   Engine Computer Memory usage (0-100%)
+ * @param mb_temperature   Main Computer Board Temperature (0-128*C)
+ * @param eb_temperature   Egine Computer Board Temperature (0-128*C) 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_status(uint8_t system_id, uint8_t component_id, mavlink_status_t *_status, mavlink_message_t* msg,
-                               uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage)
+                               uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage, const uint8_t *mb_temperature, const uint8_t *eb_temperature)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
     char buf[MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN];
@@ -103,7 +116,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_status(uint8_t
     _mav_put_uint8_t(buf, 1, mb_memory_usage);
     _mav_put_uint8_t(buf, 2, eb_cpu_usage);
     _mav_put_uint8_t(buf, 3, eb_memory_usage);
-
+    _mav_put_uint8_t_array(buf, 4, mb_temperature, 3);
+    _mav_put_uint8_t_array(buf, 7, eb_temperature, 3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), buf, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #else
     mavlink_simba_computers_telemetry_t packet;
@@ -111,7 +125,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_status(uint8_t
     packet.mb_memory_usage = mb_memory_usage;
     packet.eb_cpu_usage = eb_cpu_usage;
     packet.eb_memory_usage = eb_memory_usage;
-
+    mav_array_memcpy(packet.mb_temperature, mb_temperature, sizeof(uint8_t)*3);
+    mav_array_memcpy(packet.eb_temperature, eb_temperature, sizeof(uint8_t)*3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), &packet, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #endif
 
@@ -129,15 +144,17 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_status(uint8_t
  * @param component_id ID of this component (e.g. 200 for IMU)
  * @param chan The MAVLink channel this message will be sent over
  * @param msg The MAVLink message to compress the data into
- * @param mb_cpu_usage  Main Computer CPU usage (0-100%)
- * @param mb_memory_usage  Main Computer Memory usage (0-100%)
- * @param eb_cpu_usage  Engine Computer CPU usage (0-100%)
- * @param eb_memory_usage  Engine Computer Memory usage (0-100%)
+ * @param mb_cpu_usage   Main Computer CPU usage (0-100%)
+ * @param mb_memory_usage   Main Computer Memory usage (0-100%)
+ * @param eb_cpu_usage   Engine Computer CPU usage (0-100%)
+ * @param eb_memory_usage   Engine Computer Memory usage (0-100%)
+ * @param mb_temperature   Main Computer Board Temperature (0-128*C)
+ * @param eb_temperature   Egine Computer Board Temperature (0-128*C) 
  * @return length of the message in bytes (excluding serial stream start sign)
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_chan(uint8_t system_id, uint8_t component_id, uint8_t chan,
                                mavlink_message_t* msg,
-                                   uint8_t mb_cpu_usage,uint8_t mb_memory_usage,uint8_t eb_cpu_usage,uint8_t eb_memory_usage)
+                                   uint8_t mb_cpu_usage,uint8_t mb_memory_usage,uint8_t eb_cpu_usage,uint8_t eb_memory_usage,const uint8_t *mb_temperature,const uint8_t *eb_temperature)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
     char buf[MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN];
@@ -145,7 +162,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_chan(uint8_t s
     _mav_put_uint8_t(buf, 1, mb_memory_usage);
     _mav_put_uint8_t(buf, 2, eb_cpu_usage);
     _mav_put_uint8_t(buf, 3, eb_memory_usage);
-
+    _mav_put_uint8_t_array(buf, 4, mb_temperature, 3);
+    _mav_put_uint8_t_array(buf, 7, eb_temperature, 3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), buf, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #else
     mavlink_simba_computers_telemetry_t packet;
@@ -153,7 +171,8 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_chan(uint8_t s
     packet.mb_memory_usage = mb_memory_usage;
     packet.eb_cpu_usage = eb_cpu_usage;
     packet.eb_memory_usage = eb_memory_usage;
-
+    mav_array_memcpy(packet.mb_temperature, mb_temperature, sizeof(uint8_t)*3);
+    mav_array_memcpy(packet.eb_temperature, eb_temperature, sizeof(uint8_t)*3);
         memcpy(_MAV_PAYLOAD_NON_CONST(msg), &packet, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);
 #endif
 
@@ -171,7 +190,7 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_pack_chan(uint8_t s
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_encode(uint8_t system_id, uint8_t component_id, mavlink_message_t* msg, const mavlink_simba_computers_telemetry_t* simba_computers_telemetry)
 {
-    return mavlink_msg_simba_computers_telemetry_pack(system_id, component_id, msg, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage);
+    return mavlink_msg_simba_computers_telemetry_pack(system_id, component_id, msg, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage, simba_computers_telemetry->mb_temperature, simba_computers_telemetry->eb_temperature);
 }
 
 /**
@@ -185,7 +204,7 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_encode(uint8_t syst
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_encode_chan(uint8_t system_id, uint8_t component_id, uint8_t chan, mavlink_message_t* msg, const mavlink_simba_computers_telemetry_t* simba_computers_telemetry)
 {
-    return mavlink_msg_simba_computers_telemetry_pack_chan(system_id, component_id, chan, msg, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage);
+    return mavlink_msg_simba_computers_telemetry_pack_chan(system_id, component_id, chan, msg, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage, simba_computers_telemetry->mb_temperature, simba_computers_telemetry->eb_temperature);
 }
 
 /**
@@ -199,21 +218,23 @@ static inline uint16_t mavlink_msg_simba_computers_telemetry_encode_chan(uint8_t
  */
 static inline uint16_t mavlink_msg_simba_computers_telemetry_encode_status(uint8_t system_id, uint8_t component_id, mavlink_status_t* _status, mavlink_message_t* msg, const mavlink_simba_computers_telemetry_t* simba_computers_telemetry)
 {
-    return mavlink_msg_simba_computers_telemetry_pack_status(system_id, component_id, _status, msg,  simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage);
+    return mavlink_msg_simba_computers_telemetry_pack_status(system_id, component_id, _status, msg,  simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage, simba_computers_telemetry->mb_temperature, simba_computers_telemetry->eb_temperature);
 }
 
 /**
  * @brief Send a simba_computers_telemetry message
  * @param chan MAVLink channel to send the message
  *
- * @param mb_cpu_usage  Main Computer CPU usage (0-100%)
- * @param mb_memory_usage  Main Computer Memory usage (0-100%)
- * @param eb_cpu_usage  Engine Computer CPU usage (0-100%)
- * @param eb_memory_usage  Engine Computer Memory usage (0-100%)
+ * @param mb_cpu_usage   Main Computer CPU usage (0-100%)
+ * @param mb_memory_usage   Main Computer Memory usage (0-100%)
+ * @param eb_cpu_usage   Engine Computer CPU usage (0-100%)
+ * @param eb_memory_usage   Engine Computer Memory usage (0-100%)
+ * @param mb_temperature   Main Computer Board Temperature (0-128*C)
+ * @param eb_temperature   Egine Computer Board Temperature (0-128*C) 
  */
 #ifdef MAVLINK_USE_CONVENIENCE_FUNCTIONS
 
-static inline void mavlink_msg_simba_computers_telemetry_send(mavlink_channel_t chan, uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage)
+static inline void mavlink_msg_simba_computers_telemetry_send(mavlink_channel_t chan, uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage, const uint8_t *mb_temperature, const uint8_t *eb_temperature)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
     char buf[MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN];
@@ -221,7 +242,8 @@ static inline void mavlink_msg_simba_computers_telemetry_send(mavlink_channel_t 
     _mav_put_uint8_t(buf, 1, mb_memory_usage);
     _mav_put_uint8_t(buf, 2, eb_cpu_usage);
     _mav_put_uint8_t(buf, 3, eb_memory_usage);
-
+    _mav_put_uint8_t_array(buf, 4, mb_temperature, 3);
+    _mav_put_uint8_t_array(buf, 7, eb_temperature, 3);
     _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY, buf, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC);
 #else
     mavlink_simba_computers_telemetry_t packet;
@@ -229,7 +251,8 @@ static inline void mavlink_msg_simba_computers_telemetry_send(mavlink_channel_t 
     packet.mb_memory_usage = mb_memory_usage;
     packet.eb_cpu_usage = eb_cpu_usage;
     packet.eb_memory_usage = eb_memory_usage;
-
+    mav_array_memcpy(packet.mb_temperature, mb_temperature, sizeof(uint8_t)*3);
+    mav_array_memcpy(packet.eb_temperature, eb_temperature, sizeof(uint8_t)*3);
     _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY, (const char *)&packet, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC);
 #endif
 }
@@ -242,7 +265,7 @@ static inline void mavlink_msg_simba_computers_telemetry_send(mavlink_channel_t 
 static inline void mavlink_msg_simba_computers_telemetry_send_struct(mavlink_channel_t chan, const mavlink_simba_computers_telemetry_t* simba_computers_telemetry)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
-    mavlink_msg_simba_computers_telemetry_send(chan, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage);
+    mavlink_msg_simba_computers_telemetry_send(chan, simba_computers_telemetry->mb_cpu_usage, simba_computers_telemetry->mb_memory_usage, simba_computers_telemetry->eb_cpu_usage, simba_computers_telemetry->eb_memory_usage, simba_computers_telemetry->mb_temperature, simba_computers_telemetry->eb_temperature);
 #else
     _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY, (const char *)simba_computers_telemetry, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC);
 #endif
@@ -256,7 +279,7 @@ static inline void mavlink_msg_simba_computers_telemetry_send_struct(mavlink_cha
   is usually the receive buffer for the channel, and allows a reply to an
   incoming message with minimum stack space usage.
  */
-static inline void mavlink_msg_simba_computers_telemetry_send_buf(mavlink_message_t *msgbuf, mavlink_channel_t chan,  uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage)
+static inline void mavlink_msg_simba_computers_telemetry_send_buf(mavlink_message_t *msgbuf, mavlink_channel_t chan,  uint8_t mb_cpu_usage, uint8_t mb_memory_usage, uint8_t eb_cpu_usage, uint8_t eb_memory_usage, const uint8_t *mb_temperature, const uint8_t *eb_temperature)
 {
 #if MAVLINK_NEED_BYTE_SWAP || !MAVLINK_ALIGNED_FIELDS
     char *buf = (char *)msgbuf;
@@ -264,7 +287,8 @@ static inline void mavlink_msg_simba_computers_telemetry_send_buf(mavlink_messag
     _mav_put_uint8_t(buf, 1, mb_memory_usage);
     _mav_put_uint8_t(buf, 2, eb_cpu_usage);
     _mav_put_uint8_t(buf, 3, eb_memory_usage);
-
+    _mav_put_uint8_t_array(buf, 4, mb_temperature, 3);
+    _mav_put_uint8_t_array(buf, 7, eb_temperature, 3);
     _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY, buf, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC);
 #else
     mavlink_simba_computers_telemetry_t *packet = (mavlink_simba_computers_telemetry_t *)msgbuf;
@@ -272,7 +296,8 @@ static inline void mavlink_msg_simba_computers_telemetry_send_buf(mavlink_messag
     packet->mb_memory_usage = mb_memory_usage;
     packet->eb_cpu_usage = eb_cpu_usage;
     packet->eb_memory_usage = eb_memory_usage;
-
+    mav_array_memcpy(packet->mb_temperature, mb_temperature, sizeof(uint8_t)*3);
+    mav_array_memcpy(packet->eb_temperature, eb_temperature, sizeof(uint8_t)*3);
     _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY, (const char *)packet, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_MIN_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_CRC);
 #endif
 }
@@ -286,7 +311,7 @@ static inline void mavlink_msg_simba_computers_telemetry_send_buf(mavlink_messag
 /**
  * @brief Get field mb_cpu_usage from simba_computers_telemetry message
  *
- * @return  Main Computer CPU usage (0-100%)
+ * @return   Main Computer CPU usage (0-100%)
  */
 static inline uint8_t mavlink_msg_simba_computers_telemetry_get_mb_cpu_usage(const mavlink_message_t* msg)
 {
@@ -296,7 +321,7 @@ static inline uint8_t mavlink_msg_simba_computers_telemetry_get_mb_cpu_usage(con
 /**
  * @brief Get field mb_memory_usage from simba_computers_telemetry message
  *
- * @return  Main Computer Memory usage (0-100%)
+ * @return   Main Computer Memory usage (0-100%)
  */
 static inline uint8_t mavlink_msg_simba_computers_telemetry_get_mb_memory_usage(const mavlink_message_t* msg)
 {
@@ -306,7 +331,7 @@ static inline uint8_t mavlink_msg_simba_computers_telemetry_get_mb_memory_usage(
 /**
  * @brief Get field eb_cpu_usage from simba_computers_telemetry message
  *
- * @return  Engine Computer CPU usage (0-100%)
+ * @return   Engine Computer CPU usage (0-100%)
  */
 static inline uint8_t mavlink_msg_simba_computers_telemetry_get_eb_cpu_usage(const mavlink_message_t* msg)
 {
@@ -316,11 +341,31 @@ static inline uint8_t mavlink_msg_simba_computers_telemetry_get_eb_cpu_usage(con
 /**
  * @brief Get field eb_memory_usage from simba_computers_telemetry message
  *
- * @return  Engine Computer Memory usage (0-100%)
+ * @return   Engine Computer Memory usage (0-100%)
  */
 static inline uint8_t mavlink_msg_simba_computers_telemetry_get_eb_memory_usage(const mavlink_message_t* msg)
 {
     return _MAV_RETURN_uint8_t(msg,  3);
+}
+
+/**
+ * @brief Get field mb_temperature from simba_computers_telemetry message
+ *
+ * @return   Main Computer Board Temperature (0-128*C)
+ */
+static inline uint16_t mavlink_msg_simba_computers_telemetry_get_mb_temperature(const mavlink_message_t* msg, uint8_t *mb_temperature)
+{
+    return _MAV_RETURN_uint8_t_array(msg, mb_temperature, 3,  4);
+}
+
+/**
+ * @brief Get field eb_temperature from simba_computers_telemetry message
+ *
+ * @return   Egine Computer Board Temperature (0-128*C) 
+ */
+static inline uint16_t mavlink_msg_simba_computers_telemetry_get_eb_temperature(const mavlink_message_t* msg, uint8_t *eb_temperature)
+{
+    return _MAV_RETURN_uint8_t_array(msg, eb_temperature, 3,  7);
 }
 
 /**
@@ -336,6 +381,8 @@ static inline void mavlink_msg_simba_computers_telemetry_decode(const mavlink_me
     simba_computers_telemetry->mb_memory_usage = mavlink_msg_simba_computers_telemetry_get_mb_memory_usage(msg);
     simba_computers_telemetry->eb_cpu_usage = mavlink_msg_simba_computers_telemetry_get_eb_cpu_usage(msg);
     simba_computers_telemetry->eb_memory_usage = mavlink_msg_simba_computers_telemetry_get_eb_memory_usage(msg);
+    mavlink_msg_simba_computers_telemetry_get_mb_temperature(msg, simba_computers_telemetry->mb_temperature);
+    mavlink_msg_simba_computers_telemetry_get_eb_temperature(msg, simba_computers_telemetry->eb_temperature);
 #else
         uint8_t len = msg->len < MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN? msg->len : MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN;
         memset(simba_computers_telemetry, 0, MAVLINK_MSG_ID_SIMBA_COMPUTERS_TELEMETRY_LEN);

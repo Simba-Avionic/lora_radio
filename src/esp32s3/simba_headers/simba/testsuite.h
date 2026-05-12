@@ -412,7 +412,7 @@ static void mavlink_test_simba_computers_telemetry(uint8_t system_id, uint8_t co
         uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
         uint16_t i;
     mavlink_simba_computers_telemetry_t packet_in = {
-        5,72,139,206
+        5,72,139,206,{ 17, 18, 19 },{ 218, 219, 220 }
     };
     mavlink_simba_computers_telemetry_t packet1, packet2;
         memset(&packet1, 0, sizeof(packet1));
@@ -421,6 +421,8 @@ static void mavlink_test_simba_computers_telemetry(uint8_t system_id, uint8_t co
         packet1.eb_cpu_usage = packet_in.eb_cpu_usage;
         packet1.eb_memory_usage = packet_in.eb_memory_usage;
         
+        mav_array_memcpy(packet1.mb_temperature, packet_in.mb_temperature, sizeof(uint8_t)*3);
+        mav_array_memcpy(packet1.eb_temperature, packet_in.eb_temperature, sizeof(uint8_t)*3);
         
 #ifdef MAVLINK_STATUS_FLAG_OUT_MAVLINK1
         if (status->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) {
@@ -434,12 +436,12 @@ static void mavlink_test_simba_computers_telemetry(uint8_t system_id, uint8_t co
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_simba_computers_telemetry_pack(system_id, component_id, &msg , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage );
+    mavlink_msg_simba_computers_telemetry_pack(system_id, component_id, &msg , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage , packet1.mb_temperature , packet1.eb_temperature );
     mavlink_msg_simba_computers_telemetry_decode(&msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_simba_computers_telemetry_pack_chan(system_id, component_id, MAVLINK_COMM_0, &msg , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage );
+    mavlink_msg_simba_computers_telemetry_pack_chan(system_id, component_id, MAVLINK_COMM_0, &msg , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage , packet1.mb_temperature , packet1.eb_temperature );
     mavlink_msg_simba_computers_telemetry_decode(&msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
@@ -452,7 +454,7 @@ static void mavlink_test_simba_computers_telemetry(uint8_t system_id, uint8_t co
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
         
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_simba_computers_telemetry_send(MAVLINK_COMM_1 , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage );
+    mavlink_msg_simba_computers_telemetry_send(MAVLINK_COMM_1 , packet1.mb_cpu_usage , packet1.mb_memory_usage , packet1.eb_cpu_usage , packet1.eb_memory_usage , packet1.mb_temperature , packet1.eb_temperature );
     mavlink_msg_simba_computers_telemetry_decode(last_msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 

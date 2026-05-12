@@ -1,8 +1,7 @@
 #include <SPI.h>
 #include <RadioLib.h>     // from RadioLib by Jan Gromes v7.6.0
 #include <TinyGPS++.h>    // from TinyGPSPlus by Mikal Hart v1.0.3
-#include <MAVLink.h>
-#include "simba_headers/simba/simba.h" // generated from simba.xml
+#include "simba_headers/simba/mavlink.h" // generated from simba.xml
 
 #include "LoRaQueue.hpp"
 
@@ -26,6 +25,8 @@
 #define MAV_TX     1
 
 #define TX_INTERVAL_MS 2000UL
+#define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
+#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
 
 int debugInt = 0;
 
@@ -38,8 +39,13 @@ HardwareSerial SerialMAV(2);
 
 void readInternalGPSPos();
 void sendInternalGPSPos();
+void sendInternalGPSToComputer();
+
+void sendRadioStatsToComputer();
+
 void readRadioTransmission();
 void sendRadioTransmission();
+
 void readMavlinkUART();
 
 void sendBytesToComputer(uint8_t* data, size_t length);
@@ -94,6 +100,7 @@ void loop() {
 
   // read InternalGNSS bytes
   readInternalGPSPos();
+  sendInternalGPSToComputer();
 
   // read Main computer mavlink bytes & queue up for transmiton
   readMavlinkUART();
@@ -111,6 +118,7 @@ void loop() {
   #endif
 
   // send link stats to Serial once in a while
+  sendRadioStatsToComputer();
 
   delay(10);
 }
@@ -131,16 +139,6 @@ void readInternalGPSPos()
 {
   while (Serial1.available() > 0)
     gpsInternal.encode(Serial1.read());
-
-  if (gpsInternal.time.isUpdated())
-  {
-    // Serial.print("Time: ");
-    // Serial.print(gpsInternal.time.hour());
-    // Serial.print(":");
-    // Serial.print(gpsInternal.time.minute());
-    // Serial.print(":");
-    // Serial.println(gpsInternal.time.second());
-  }
 }
 
 void sendInternalGPSPos()
@@ -160,6 +158,57 @@ void sendInternalGPSPos()
   #ifdef DEBUG
     Serial.println("Enqueue, queue size: " + String(loraQueue.getFillPercentage()) + "%");
   #endif
+}
+
+void sendInternalGPSToComputer()
+{
+  static unsigned long lastSend = 0;
+
+  if (millis() - lastSend < TX_GNSS_TO_COMPUTER_INTERVAL_MS) {
+    return; // not time to send yet
+  }
+  lastSend = millis();
+  static mavlink_message_t msg;
+  static mavlink_status_t mav_status;
+
+  mavlink_msg_l76k_gps_pack(1, 221, &msg, gpsInternal.date.value(), gpsInternal.time.value(), gpsInternal.location.lat() * 1e7, gpsInternal.location.lng() * 1e7, gpsInternal.speed.mps(),
+                              gpsInternal.course.deg(), gpsInternal.altitude.meters() * 100, gpsInternal.satellites.value(), gpsInternal.hdop.value(), gpsInternal.sentencesWithFix());
+  uint8_t txBuffer[300];
+  uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
+  Serial.println("L76K GPS mavlink packet:");
+  sendBytesToComputer(txBuffer, len);
+  Serial.println("\nEnd of L76K GPS mavlink packet");
+}
+
+void sendRadioStatsToComputer()
+{
+  static unsigned long lastSend = 0;
+
+  if (millis() - lastSend < TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS) {
+    return; // not time to send yet
+  }
+  lastSend = millis();
+  static mavlink_message_t msg;
+  static mavlink_status_t mav_status;
+  // static inline uint16_t mavlink_msg_radio_status_pack(uint8_t system_id, uint8_t component_id, mavlink_message_t* msg,
+                              //  uint8_t rssi, uint8_t remrssi, uint8_t txbuf, uint8_t noise, uint8_t remnoise, uint16_t rxerrors, uint16_t fixed)
+
+  float rssi = radio.getRSSI();
+  float snr = radio.getSNR();
+  float noise = rssi - snr;
+
+  // convert rssi and noise to 0-255 range by adding 200
+  uint8_t rssiByte = (uint8_t)(rssi + 200);
+  uint8_t noiseByte = (uint8_t)(noise + 200);
+  #ifdef DEBUG
+    Serial.printf("RSSI: %.2f, Noise: %.2f, SNR: %.2f\n", rssi, noise, snr);
+  #endif
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, 0, 0);
+  uint8_t txBuffer[300];
+  uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
+  Serial.println("Radio status mavlink packet:");
+  sendBytesToComputer(txBuffer, len);
+  Serial.println("\nEnd of radio status mavlink packet");
 }
 
 void readMavlinkUART()

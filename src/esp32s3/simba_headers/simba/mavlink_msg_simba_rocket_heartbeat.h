@@ -6,7 +6,7 @@
 
 typedef struct __mavlink_simba_rocket_heartbeat_t {
  uint64_t timestamp; /*<  Timestamp (system uptime in ms)*/
- uint32_t apps_alive; /*<  Bitmap for all ec and fc apps*/
+ uint32_t apps_alive; /*<   Bitmap for all ec and fc apps */
  uint8_t flight_computer_state; /*<  Flight computer state*/
  uint8_t engine_computer_state; /*<  Engine computer state*/
  uint8_t values; /*<  Actuator bitmask*/
@@ -57,7 +57,7 @@ typedef struct __mavlink_simba_rocket_heartbeat_t {
  * @param msg The MAVLink message to compress the data into
  *
  * @param timestamp  Timestamp (system uptime in ms)
- * @param apps_alive  Bitmap for all ec and fc apps
+ * @param apps_alive   Bitmap for all ec and fc apps 
  * @param flight_computer_state  Flight computer state
  * @param engine_computer_state  Engine computer state
  * @param values  Actuator bitmask
@@ -101,7 +101,7 @@ static inline uint16_t mavlink_msg_simba_rocket_heartbeat_pack(uint8_t system_id
  * @param msg The MAVLink message to compress the data into
  *
  * @param timestamp  Timestamp (system uptime in ms)
- * @param apps_alive  Bitmap for all ec and fc apps
+ * @param apps_alive   Bitmap for all ec and fc apps 
  * @param flight_computer_state  Flight computer state
  * @param engine_computer_state  Engine computer state
  * @param values  Actuator bitmask
@@ -148,7 +148,7 @@ static inline uint16_t mavlink_msg_simba_rocket_heartbeat_pack_status(uint8_t sy
  * @param chan The MAVLink channel this message will be sent over
  * @param msg The MAVLink message to compress the data into
  * @param timestamp  Timestamp (system uptime in ms)
- * @param apps_alive  Bitmap for all ec and fc apps
+ * @param apps_alive   Bitmap for all ec and fc apps 
  * @param flight_computer_state  Flight computer state
  * @param engine_computer_state  Engine computer state
  * @param values  Actuator bitmask
@@ -231,7 +231,7 @@ static inline uint16_t mavlink_msg_simba_rocket_heartbeat_encode_status(uint8_t 
  * @param chan MAVLink channel to send the message
  *
  * @param timestamp  Timestamp (system uptime in ms)
- * @param apps_alive  Bitmap for all ec and fc apps
+ * @param apps_alive   Bitmap for all ec and fc apps 
  * @param flight_computer_state  Flight computer state
  * @param engine_computer_state  Engine computer state
  * @param values  Actuator bitmask
@@ -330,7 +330,7 @@ static inline uint64_t mavlink_msg_simba_rocket_heartbeat_get_timestamp(const ma
 /**
  * @brief Get field apps_alive from simba_rocket_heartbeat message
  *
- * @return  Bitmap for all ec and fc apps
+ * @return   Bitmap for all ec and fc apps 
  */
 static inline uint32_t mavlink_msg_simba_rocket_heartbeat_get_apps_alive(const mavlink_message_t* msg)
 {
