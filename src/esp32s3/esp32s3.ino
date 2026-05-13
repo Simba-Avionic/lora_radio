@@ -222,6 +222,11 @@ void sendRadioStatsToComputer()
   float snr = radio.getSNR();
   float noise = rssi - snr;
 
+  if (rssi < -200) rssi = -200;
+  if (noise < -200) noise = -200;
+  if (rssi > 55) rssi = 55;
+  if (noise > 55) noise = 55;
+
   // convert rssi and noise to 0-255 range by adding 200
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
