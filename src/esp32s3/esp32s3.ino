@@ -72,6 +72,7 @@ struct RadioStatus
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
+  ledOff();
 
   Serial.begin(57600);
 
