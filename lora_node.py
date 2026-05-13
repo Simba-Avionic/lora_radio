@@ -5,18 +5,6 @@ from lora_ros_msgs.msg import GpsShort, LoraStatus, LoraGnss
 # import threads
 import threading
 
-import time
-
-# check if pymavlink is at least2.4.49
-try:
-    from pymavlink import mavutil
-    if mavutil.__version__ < '2.4.49':
-        raise ImportError(f'pymavlink version must be at least 2.4.49, but found {mavutil.__version__}')
-except ImportError as e:
-    print(f'Error importing pymavlink: {e}')
-    print('Please install or upgrade pymavlink to version 2.4.49 or higher')
-    exit(1)
-
 # import mavlink (simba_mavlink dialect)
 from pymavlink import mavutil
 import simba_mavlink
