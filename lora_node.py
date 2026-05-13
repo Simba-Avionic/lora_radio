@@ -5,6 +5,8 @@ from lora_ros_msgs.msg import GpsShort, LoraStatus, LoraGnss
 # import threads
 import threading
 
+import time
+
 # import mavlink (simba_mavlink dialect)
 
 from pymavlink import mavutil
@@ -29,13 +31,24 @@ class LoRaNode(Node):
         self.working = True
         self.r_thread.start()
 
+        self.h_thread = threading.Thread(target=self.send_heartbeat)
+        self.h_thread.start()
+
+    def send_heartbeat(self):
+        while self.working:
+            input("Press Enter to send simba gps...")
+            # send a shortgps msg to rocket
+            self.mavlink_connection.mav.simba_gps_send(
+                int(52.1234567 * 1e7),   # lat
+                int(21.1234567 * 1e7),  # lon
+                int(123.456 * 1e3)      # altitude mm
+            )
 
     def reading_thread(self):
         while self.working:
             msg = self.mavlink_connection.recv_match(blocking=True)
             if msg is not None:
                 if msg.get_type() == 'L76K_GPS':
-                    print(msg)
                     ros_msg = LoraGnss()
                     ros_msg.header.stamp = self.get_clock().now().to_msg()
                     ros_msg.header.frame_id = '/mission_control/lora'
@@ -50,9 +63,8 @@ class LoRaNode(Node):
                     ros_msg.hdop = msg.hdop / 1e2
                     ros_msg.sentences_with_fix = msg.sentences_with_fix
                     self.publisher_lora_gnss.publish(ros_msg)
-                    self.get_logger().info(f'Published LoRa GNSS: {ros_msg}')
+                    # self.get_logger().info(f'Published LoRa GNSS: {ros_msg}')
                 elif msg.get_type() == 'RADIO_STATUS':
-                    print(msg)
                     ros_msg = LoraStatus()
                     ros_msg.header.stamp = self.get_clock().now().to_msg()
                     ros_msg.header.frame_id = '/mission_control/lora'
@@ -66,9 +78,8 @@ class LoRaNode(Node):
                     ros_msg.rx_errors = msg.rxerrors
                     ros_msg.rx_fixed = msg.fixed
                     self.publisher_lora_status.publish(ros_msg)
-                    self.get_logger().info(f'Published LoRa Status: {ros_msg}')
+                    # self.get_logger().info(f'Published LoRa Status: {ros_msg}')
                 elif msg.get_type() == 'SIMBA_GPS':
-                    print(msg)
                     ros_msg = GpsShort()
                     ros_msg.header.stamp = self.get_clock().now().to_msg()
                     ros_msg.latitude_deg = msg.lat / 1e7
@@ -82,7 +93,7 @@ class LoRaNode(Node):
                         ros_msg.header.frame_id = '/rocket/gps'
                         self.publisher_rocket_gps.publish(ros_msg)
 
-                    self.get_logger().info(f'Published GPS: {ros_msg}')
+                    # self.get_logger().info(f'Published GPS: {ros_msg}')
                 
 
     def destroy_node(self):
