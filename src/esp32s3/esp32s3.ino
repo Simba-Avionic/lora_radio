@@ -29,7 +29,7 @@
 #define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
 #define LOOP_DELAY_MS 10UL      // main loop delay
 
-int debugInt = 0;
+#define UART_RING_BUFFER_SIZE 4096
 
 LoRaQueue loraQueue;
 
@@ -73,6 +73,10 @@ struct RadioStatus
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   ledOff();
+
+  Serial.setRxBufferSize(UART_RING_BUFFER_SIZE);
+  Serial1.setRxBufferSize(UART_RING_BUFFER_SIZE);
+  SerialMAV.setRxBufferSize(UART_RING_BUFFER_SIZE);
 
   Serial.begin(57600);
 
