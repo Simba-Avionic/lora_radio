@@ -27,6 +27,7 @@
 #define TX_INTERVAL_MS 2000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
 #define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
+#define LOOP_DELAY_MS 10UL      // main loop delay
 
 int debugInt = 0;
 
@@ -57,6 +58,10 @@ void radioEventCallback() {
 
 void updateRadioStatus();
 
+inline void ledOn() { digitalWrite(LED_BUILTIN, LOW); }
+
+inline void ledOff() { digitalWrite(LED_BUILTIN, HIGH); }
+
 struct RadioStatus
 {
   bool TXdone = true;
@@ -67,7 +72,7 @@ struct RadioStatus
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
+
   Serial.begin(57600);
 
   Serial1.begin(9600, SERIAL_8N1, GPS_INT_RX, GPS_INT_TX);
@@ -95,7 +100,10 @@ void setup() {
 }
 
 void loop() {
+  unsigned long loopStart = millis();
+
   // update radio status based on events
+  // HAS delay(1) INSIDE
   updateRadioStatus();
 
   // read InternalGNSS bytes
@@ -120,7 +128,11 @@ void loop() {
   // send link stats to Serial once in a while
   sendRadioStatsToComputer();
 
-  delay(10);
+  // count delay and imply a delay so it is a LOOP_DELAY_MS delay between the start of each loop iteration
+  unsigned long loopDuration = millis() - loopStart;
+  if (loopDuration < LOOP_DELAY_MS) {
+    delay(LOOP_DELAY_MS - loopDuration);
+  }
 }
 
 void updateRadioStatus()
@@ -130,8 +142,28 @@ void updateRadioStatus()
     // get irq status
     uint32_t irq = radio.getIrqFlags();
     radio.clearIrqFlags(irq);
-    if (irq & RADIOLIB_SX126X_IRQ_TX_DONE) radioStatus.TXdone = true;
-    if (irq & RADIOLIB_SX126X_IRQ_RX_DONE) radioStatus.RXdone = true;
+    if (irq & RADIOLIB_SX126X_IRQ_TX_DONE) 
+    {
+      radioStatus.TXdone = true;
+      ledOff();
+    }
+
+    // header is valid, we are receiving a message
+    if (irq & RADIOLIB_SX126X_IRQ_HEADER_VALID)
+    {
+      ledOn();
+      delay(1);
+    }
+
+    // RX is done for RX_DONE, CRC_ERR, HEADER_ERR, TIMEOUT
+    if ((irq & RADIOLIB_SX126X_IRQ_RX_DONE) ||
+          (irq & RADIOLIB_SX126X_IRQ_CRC_ERR) ||
+            (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR) ||
+              (irq & RADIOLIB_SX126X_IRQ_TIMEOUT))
+    {
+      radioStatus.RXdone = true;
+      ledOff();
+    }
   }
 }
 
@@ -155,9 +187,6 @@ void sendInternalGPSPos()
   uint8_t txBuffer[300];
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   LoRaQueue::Status status = loraQueue.enqueue(txBuffer, len);
-  #ifdef DEBUG
-    Serial.println("Enqueue, queue size: " + String(loraQueue.getFillPercentage()) + "%");
-  #endif
 }
 
 void sendInternalGPSToComputer()
@@ -175,9 +204,7 @@ void sendInternalGPSToComputer()
                               gpsInternal.course.deg(), gpsInternal.altitude.meters() * 100, gpsInternal.satellites.value(), gpsInternal.hdop.value(), gpsInternal.sentencesWithFix());
   uint8_t txBuffer[300];
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
-  Serial.println("L76K GPS mavlink packet:");
   sendBytesToComputer(txBuffer, len);
-  Serial.println("\nEnd of L76K GPS mavlink packet");
 }
 
 void sendRadioStatsToComputer()
@@ -190,8 +217,6 @@ void sendRadioStatsToComputer()
   lastSend = millis();
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
-  // static inline uint16_t mavlink_msg_radio_status_pack(uint8_t system_id, uint8_t component_id, mavlink_message_t* msg,
-                              //  uint8_t rssi, uint8_t remrssi, uint8_t txbuf, uint8_t noise, uint8_t remnoise, uint16_t rxerrors, uint16_t fixed)
 
   float rssi = radio.getRSSI();
   float snr = radio.getSNR();
@@ -200,15 +225,11 @@ void sendRadioStatsToComputer()
   // convert rssi and noise to 0-255 range by adding 200
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
-  #ifdef DEBUG
-    Serial.printf("RSSI: %.2f, Noise: %.2f, SNR: %.2f\n", rssi, noise, snr);
-  #endif
+
   mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, 0, 0);
   uint8_t txBuffer[300];
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
-  Serial.println("Radio status mavlink packet:");
   sendBytesToComputer(txBuffer, len);
-  Serial.println("\nEnd of radio status mavlink packet");
 }
 
 void readMavlinkUART()
@@ -279,11 +300,8 @@ void sendRadioTransmission()
   if (length == 0) {
     return; // no message to send
   }
-  
-  #ifdef DEBUG
-    Serial.println("Dequeue, queue size: " + String(loraQueue.getFillPercentage()) + "%");
-  #endif
-  
+
+  ledOn();
   radioStatus.TXdone = false;
   radioStatus.TXsending = true;
   radio.startTransmit(data, length);
