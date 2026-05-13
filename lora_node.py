@@ -35,6 +35,7 @@ class LoRaNode(Node):
         while self.working:
             input("Press Enter to send simba gps...")
             # send a shortgps msg to rocket
+            self.mavlink_connection.mav.srcComponent = 200
             self.mavlink_connection.mav.simba_gps_send(
                 int(52.1234567 * 1e7),   # lat
                 int(21.1234567 * 1e7),  # lon
