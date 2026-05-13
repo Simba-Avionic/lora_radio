@@ -243,10 +243,25 @@ void readMavlinkUART()
   static mavlink_status_t mav_status;
   static uint8_t txBuffer[300];
 
-  // read mavlink bytes and queue up for transmission
+  // read mavlink bytes FROM UART and queue up for transmission
   while (SerialMAV.available())
   {
     uint8_t c = SerialMAV.read();
+
+    if (!mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &mav_status)) {
+      continue; 
+    }
+
+    // mamy pełną ramkę MAVLink
+
+    uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
+    LoRaQueue::Status status = loraQueue.enqueue(txBuffer, len);
+  }
+
+  // read mavlink bytes FROM USB and queue up for transmission
+  while (Serial.available())
+  {
+    uint8_t c = Serial.read();
 
     if (!mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &mav_status)) {
       continue; 
