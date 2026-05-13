@@ -29,7 +29,7 @@
 #define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
 #define LOOP_DELAY_MS 10UL      // main loop delay
 
-#define UART_RING_BUFFER_SIZE 4096
+#define UART_RING_BUFFER_SIZE 8096 // zabezpieczenie przed burstami danych
 
 LoRaQueue loraQueue;
 
