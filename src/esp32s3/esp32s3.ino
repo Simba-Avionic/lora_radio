@@ -9,7 +9,7 @@
 
 #define MODE_RECEIVER     0
 #define MODE_TRANSMITTER  1
-#define MODULE_MODE       MODE_TRANSMITTER
+#define MODULE_MODE       MODE_RECEIVER
 
 #define LORA_NSS   41
 #define LORA_SCK   7
@@ -37,6 +37,7 @@ SPIClass spiLora(HSPI);
 SX1262   radio = new Module(LORA_NSS, LORA_DIO1, LORA_RESET, LORA_BUSY, spiLora);
 TinyGPSPlus gpsInternal;
 HardwareSerial SerialMAV(2);
+uint16_t rxErrors = 0;
 
 void readInternalGPSPos();
 void sendInternalGPSPos();
@@ -166,6 +167,8 @@ void updateRadioStatus()
             (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR) ||
               (irq & RADIOLIB_SX126X_IRQ_TIMEOUT))
     {
+      if ((irq & RADIOLIB_SX126X_IRQ_CRC_ERR) ||
+           (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { rxErrors++; }
       radioStatus.RXdone = true;
       ledOff();
     }
@@ -223,7 +226,7 @@ void sendRadioStatsToComputer()
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
 
-  float rssi = radio.getRSSI();
+  float rssi = radio.getRSSI(true);
   float snr = radio.getSNR();
   float noise = rssi - snr;
 
@@ -236,7 +239,7 @@ void sendRadioStatsToComputer()
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
 
-  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, 0, 0);
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, rxErrors, 0);
   uint8_t txBuffer[300];
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
