@@ -37,7 +37,7 @@ SPIClass spiLora(HSPI);
 SX1262   radio = new Module(LORA_NSS, LORA_DIO1, LORA_RESET, LORA_BUSY, spiLora);
 TinyGPSPlus gpsInternal;
 HardwareSerial SerialMAV(2);
-uint16_t rxErrors = 0;
+
 
 void readInternalGPSPos();
 void sendInternalGPSPos();
@@ -63,12 +63,24 @@ inline void ledOn() { digitalWrite(LED_BUILTIN, LOW); }
 
 inline void ledOff() { digitalWrite(LED_BUILTIN, HIGH); }
 
+enum RadioMode
+{
+  RECEIVER = 0,
+  TRANSMITTER,
+  TRANSCEIVER
+};
+
 struct RadioStatus
 {
   bool TXdone = true;
   bool TXsending = false;
   bool RXdone = true;
   bool RXreceiving = false;
+
+  uint16_t rxErrors = 0;
+  
+  bool hasGNSSModule = false;
+  RadioMode mode = (RadioMode)MODULE_MODE;
 } radioStatus;
 
 void setup() {
@@ -119,17 +131,21 @@ void loop() {
   // read Main computer mavlink bytes & queue up for transmiton
   readMavlinkUART();
 
-  #if MODULE_MODE == MODE_TRANSMITTER
+  // #if MODULE_MODE == MODE_TRANSMITTER
+  if (radioStatus.mode == RadioMode::TRANSMITTER || radioStatus.mode == RadioMode::TRANSCEIVER) {
     // queue up InternalGPSPos for transmition once per X millis
     sendInternalGPSPos();
     // send radio transmission
     sendRadioTransmission();
-  #endif
+  }
+  // #endif
 
-  #if MODULE_MODE == MODE_RECEIVER              // later this define should be replaced by a boot pin check and even later by synchronization beetween the two sides
+  // #if MODULE_MODE == MODE_RECEIVER              // later this define should be replaced by a boot pin check and even later by synchronization beetween the two sides
+  if (radioStatus.mode == RadioMode::RECEIVER || radioStatus.mode == RadioMode::TRANSCEIVER) {
     // read radio transmission
     readRadioTransmission();
-  #endif
+  }
+  // #endif
 
   // send link stats to Serial once in a while
   sendRadioStatsToComputer();
@@ -173,7 +189,7 @@ void updateRadioStatus()
               (irq & RADIOLIB_SX126X_IRQ_TIMEOUT))
     {
       if ((irq & RADIOLIB_SX126X_IRQ_CRC_ERR) ||
-           (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { rxErrors++; }
+           (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { radioStatus.rxErrors++; }
       radioStatus.RXdone = true;
       turnOffLedInNextLoop = true;
     }
@@ -183,11 +199,18 @@ void updateRadioStatus()
 void readInternalGPSPos()
 {
   while (Serial1.available() > 0)
+  {
+    radioStatus.hasGNSSModule = true;
     gpsInternal.encode(Serial1.read());
+  }
 }
 
 void sendInternalGPSPos()
 {
+  if (!radioStatus.hasGNSSModule) {
+    return; // no GNSS module, nothing to send
+  }
+
   static unsigned long lastSend = 0;
 
   if (millis() - lastSend < TX_INTERVAL_MS) {
@@ -204,6 +227,10 @@ void sendInternalGPSPos()
 
 void sendInternalGPSToComputer()
 {
+  if (!radioStatus.hasGNSSModule) {
+    return; // no GNSS module, nothing to send
+  }
+
   static unsigned long lastSend = 0;
 
   if (millis() - lastSend < TX_GNSS_TO_COMPUTER_INTERVAL_MS) {
@@ -244,7 +271,7 @@ void sendRadioStatsToComputer()
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
 
-  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, rxErrors, 0);
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
   uint8_t txBuffer[300];
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
