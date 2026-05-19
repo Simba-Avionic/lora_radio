@@ -26,7 +26,7 @@
 
 #define TX_INTERVAL_MS 2000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
-#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
+#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 100
 #define LOOP_DELAY_MS 10UL      // main loop delay
 
 #define UART_RING_BUFFER_SIZE 8096 // zabezpieczenie przed burstami danych
@@ -80,6 +80,8 @@ struct RadioStatus
   uint16_t rxErrors = 0;
   
   bool hasGNSSModule = false;
+  bool hasReceivedLoRaMessage = false;
+  unsigned long lastReceivedLoRaMessageTime = 0;
   RadioMode mode = (RadioMode)MODULE_MODE;
 } radioStatus;
 
@@ -180,6 +182,8 @@ void updateRadioStatus()
     {
       ledOn();
       turnOffLedInNextLoop = true;
+      radioStatus.hasReceivedLoRaMessage = true;
+      radioStatus.lastReceivedLoRaMessageTime = millis();
     }
 
     // RX is done for RX_DONE, CRC_ERR, HEADER_ERR, TIMEOUT
@@ -258,22 +262,49 @@ void sendRadioStatsToComputer()
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
 
+  static float noise = 0.0f;
+  static float weird_noise = 0.0f;
+  static float true_snr = 0.0f;
+
   float rssi = radio.getRSSI(true);
   float snr = radio.getSNR();
-  float noise = rssi - snr;
+  weird_noise = rssi - snr;
+  float noiseCandidate = radio.getRSSI(false);
+
+  if (!radioStatus.hasReceivedLoRaMessage) { noise = noiseCandidate; }
+  auto cut_threshold = rssi - snr - 3.0;
+
+  if (noiseCandidate < cut_threshold)
+  {
+    noise = noiseCandidate;
+    true_snr = rssi - noise;
+  }
+  else if (snr < 6.0)
+  {
+    noise = rssi - snr;
+  }
+
+
+  Serial.printf("RSSI: %.2f, SNR: %.2f, Noise: %.2f, True SNR: %.2f\n", rssi, snr, noise, true_snr);
 
   if (rssi < -200) rssi = -200;
   if (noise < -200) noise = -200;
+  if (weird_noise < -200) weird_noise = -200;
   if (rssi > 55) rssi = 55;
   if (noise > 55) noise = 55;
+  if (weird_noise > 55) weird_noise = 55;
 
   // convert rssi and noise to 0-255 range by adding 200
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
+  uint8_t weirdNoiseByte = (uint8_t)(weird_noise + 200);
 
-  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
   uint8_t txBuffer[300];
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
+  sendBytesToComputer(txBuffer, len);
+  mavlink_msg_radio_status_pack(1, 222, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), weirdNoiseByte, 0, radioStatus.rxErrors, 0);
+  len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
 }
 
