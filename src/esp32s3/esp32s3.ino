@@ -143,6 +143,11 @@ void loop() {
 
 void updateRadioStatus()
 {
+  static bool turnOffLedInNextLoop = false;
+  if (turnOffLedInNextLoop) {
+    turnOffLedInNextLoop = false;
+    ledOff();
+  }
   if (radioEvent) {
     radioEvent = false;
     // get irq status
@@ -158,7 +163,7 @@ void updateRadioStatus()
     if (irq & RADIOLIB_SX126X_IRQ_HEADER_VALID)
     {
       ledOn();
-      delay(1);
+      turnOffLedInNextLoop = true;
     }
 
     // RX is done for RX_DONE, CRC_ERR, HEADER_ERR, TIMEOUT
@@ -170,7 +175,7 @@ void updateRadioStatus()
       if ((irq & RADIOLIB_SX126X_IRQ_CRC_ERR) ||
            (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { rxErrors++; }
       radioStatus.RXdone = true;
-      ledOff();
+      turnOffLedInNextLoop = true;
     }
   }
 }
