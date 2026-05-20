@@ -26,7 +26,8 @@
 
 #define TX_INTERVAL_MS 2000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
-#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 100
+#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000
+#define READ_NOISE_INTERVAL_MS 50UL
 #define LOOP_DELAY_MS 10UL      // main loop delay
 
 #define UART_RING_BUFFER_SIZE 8096 // zabezpieczenie przed burstami danych
@@ -47,6 +48,8 @@ void sendRadioStatsToComputer();
 
 void readRadioTransmission();
 void sendRadioTransmission();
+
+void readNoise();
 
 void readMavlinkUART();
 
@@ -78,6 +81,10 @@ struct RadioStatus
   bool RXreceiving = false;
 
   uint16_t rxErrors = 0;
+
+  float noise_level = 0.0f;
+  float rssi_last_msg = 0.0f;
+  float snr_last_msg = 0.0f;
   
   bool hasGNSSModule = false;
   bool hasReceivedLoRaMessage = false;
@@ -123,8 +130,10 @@ void loop() {
   unsigned long loopStart = millis();
 
   // update radio status based on events
-  // HAS delay(1) INSIDE
   updateRadioStatus();
+
+  // try to read noise level
+  readNoise();
 
   // read InternalGNSS bytes
   readInternalGPSPos();
@@ -262,30 +271,12 @@ void sendRadioStatsToComputer()
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
 
-  static float noise = 0.0f;
-  static float weird_noise = 0.0f;
-  static float true_snr = 0.0f;
+  float rssi = radioStatus.rssi_last_msg;
+  float noise = radioStatus.noise_level;
+  float weird_noise = radioStatus.rssi_last_msg - radioStatus.snr_last_msg;
 
-  float rssi = radio.getRSSI(true);
-  float snr = radio.getSNR();
-  weird_noise = rssi - snr;
-  float noiseCandidate = radio.getRSSI(false);
-
-  if (!radioStatus.hasReceivedLoRaMessage) { noise = noiseCandidate; }
-  auto cut_threshold = rssi - snr - 3.0;
-
-  if (noiseCandidate < cut_threshold)
-  {
-    noise = noiseCandidate;
-    true_snr = rssi - noise;
-  }
-  else if (snr < 6.0)
-  {
-    noise = rssi - snr;
-  }
-
-
-  Serial.printf("RSSI: %.2f, SNR: %.2f, Noise: %.2f, True SNR: %.2f\n", rssi, snr, noise, true_snr);
+  // Serial.printf("\nRSSI: %.2f, Noise: %.2f, WeirdNoise: %.2f\n", rssi, noise, weird_noise);
+  // Serial.printf("SNR: %.2f  True SNR: %.2f\n", radioStatus.snr_last_msg, rssi - noise);
 
   if (rssi < -200) rssi = -200;
   if (noise < -200) noise = -200;
@@ -300,12 +291,36 @@ void sendRadioStatsToComputer()
   uint8_t weirdNoiseByte = (uint8_t)(weird_noise + 200);
 
   uint8_t txBuffer[300];
-  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
+  // reliable rssi and link quality stats
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), weirdNoiseByte, 0, radioStatus.rxErrors, 0);
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
-  mavlink_msg_radio_status_pack(1, 222, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), weirdNoiseByte, 0, radioStatus.rxErrors, 0);
+  
+  if (radioStatus.mode == RadioMode::TRANSMITTER) {
+    return; // in transmitter mode we don't listen to the ether, so we don't know what is in there
+  }
+  // estimated, randomly tried noise floor value
+  mavlink_msg_radio_status_pack(1, 222, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
   len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
+}
+
+void readNoise()
+{
+  static unsigned long lastRead = 0;
+
+  if (millis() - lastRead < READ_NOISE_INTERVAL_MS) {
+    return; // not time to read yet
+  }
+  lastRead = millis();
+  
+  float noiseCandidate = radio.getRSSI(false);
+  if (noiseCandidate < radioStatus.rssi_last_msg - radioStatus.snr_last_msg - 3.0) {
+    radioStatus.noise_level = noiseCandidate;
+  }
+  else if (radioStatus.snr_last_msg < 6.0) {
+    radioStatus.noise_level = radioStatus.rssi_last_msg - radioStatus.snr_last_msg;
+  }
 }
 
 void readMavlinkUART()
@@ -355,6 +370,9 @@ void readRadioTransmission()
     // finish reception
     radioStatus.RXreceiving = false;
     radio.finishReceive();
+
+    radioStatus.rssi_last_msg = radio.getRSSI(true);
+    radioStatus.snr_last_msg = radio.getSNR();
 
     byte data[300];
     int numBytes = radio.getPacketLength();
