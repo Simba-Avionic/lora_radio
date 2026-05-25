@@ -21,6 +21,7 @@ class LoRaNode(Node):
         self.publisher_lora_gps = self.create_publisher(GpsShort, '/rocket/lora/gps', 10)
         self.publisher_rocket_gps = self.create_publisher(GpsShort, '/rocket/gps', 10)
         self.publisher_lora_status = self.create_publisher(LoraStatus, '/mission_control/lora/status', 10)
+        self.publisher_lora_extra_status = self.create_publisher(LoraStatus, '/mission_control/lora/extra_status', 10)
         self.publisher_lora_gnss = self.create_publisher(LoraGnss, '/mission_control/lora/gnss', 10)
         self.mavlink_connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=57600)
 
@@ -65,7 +66,6 @@ class LoRaNode(Node):
                 elif msg.get_type() == 'RADIO_STATUS':
                     ros_msg = LoraStatus()
                     ros_msg.header.stamp = self.get_clock().now().to_msg()
-                    ros_msg.header.frame_id = '/mission_control/lora'
                     ros_msg.rssi = float(msg.rssi) - 200
                     ros_msg.noise = float(msg.noise) - 200
                     ros_msg.snr = float(msg.rssi) - float(msg.noise)
@@ -75,7 +75,13 @@ class LoRaNode(Node):
                     ros_msg.rem_snr = float(msg.remrssi) - float(msg.remnoise)
                     ros_msg.rx_errors = msg.rxerrors
                     ros_msg.rx_fixed = msg.fixed
-                    self.publisher_lora_status.publish(ros_msg)
+
+                    ros_msg.header.frame_id = '/mission_control/lora'
+
+                    if msg.get_srcComponent() == 222:
+                        self.publisher_lora_extra_status.publish(ros_msg)
+                    else:
+                        self.publisher_lora_status.publish(ros_msg)
                     # self.get_logger().info(f'Published LoRa Status: {ros_msg}')
                 elif msg.get_type() == 'SIMBA_GPS':
                     ros_msg = GpsShort()

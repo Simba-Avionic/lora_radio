@@ -26,7 +26,8 @@
 
 #define TX_INTERVAL_MS 2000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
-#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000UL
+#define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000
+#define READ_NOISE_INTERVAL_MS 50UL
 #define LOOP_DELAY_MS 10UL      // main loop delay
 
 #define UART_RING_BUFFER_SIZE 8096 // zabezpieczenie przed burstami danych
@@ -37,7 +38,7 @@ SPIClass spiLora(HSPI);
 SX1262   radio = new Module(LORA_NSS, LORA_DIO1, LORA_RESET, LORA_BUSY, spiLora);
 TinyGPSPlus gpsInternal;
 HardwareSerial SerialMAV(2);
-uint16_t rxErrors = 0;
+
 
 void readInternalGPSPos();
 void sendInternalGPSPos();
@@ -47,6 +48,8 @@ void sendRadioStatsToComputer();
 
 void readRadioTransmission();
 void sendRadioTransmission();
+
+void readNoise();
 
 void readMavlinkUART();
 
@@ -63,12 +66,30 @@ inline void ledOn() { digitalWrite(LED_BUILTIN, LOW); }
 
 inline void ledOff() { digitalWrite(LED_BUILTIN, HIGH); }
 
+enum RadioMode
+{
+  RECEIVER = 0,
+  TRANSMITTER,
+  TRANSCEIVER
+};
+
 struct RadioStatus
 {
   bool TXdone = true;
   bool TXsending = false;
   bool RXdone = true;
   bool RXreceiving = false;
+
+  uint16_t rxErrors = 0;
+
+  float noise_level = 0.0f;
+  float rssi_last_msg = 0.0f;
+  float snr_last_msg = 0.0f;
+  
+  bool hasGNSSModule = false;
+  bool hasReceivedLoRaMessage = false;
+  unsigned long lastReceivedLoRaMessageTime = 0;
+  RadioMode mode = (RadioMode)MODULE_MODE;
 } radioStatus;
 
 void setup() {
@@ -109,8 +130,10 @@ void loop() {
   unsigned long loopStart = millis();
 
   // update radio status based on events
-  // HAS delay(1) INSIDE
   updateRadioStatus();
+
+  // try to read noise level
+  readNoise();
 
   // read InternalGNSS bytes
   readInternalGPSPos();
@@ -119,17 +142,21 @@ void loop() {
   // read Main computer mavlink bytes & queue up for transmiton
   readMavlinkUART();
 
-  #if MODULE_MODE == MODE_TRANSMITTER
+  // #if MODULE_MODE == MODE_TRANSMITTER
+  if (radioStatus.mode == RadioMode::TRANSMITTER || radioStatus.mode == RadioMode::TRANSCEIVER) {
     // queue up InternalGPSPos for transmition once per X millis
     sendInternalGPSPos();
     // send radio transmission
     sendRadioTransmission();
-  #endif
+  }
+  // #endif
 
-  #if MODULE_MODE == MODE_RECEIVER              // later this define should be replaced by a boot pin check and even later by synchronization beetween the two sides
+  // #if MODULE_MODE == MODE_RECEIVER              // later this define should be replaced by a boot pin check and even later by synchronization beetween the two sides
+  if (radioStatus.mode == RadioMode::RECEIVER || radioStatus.mode == RadioMode::TRANSCEIVER) {
     // read radio transmission
     readRadioTransmission();
-  #endif
+  }
+  // #endif
 
   // send link stats to Serial once in a while
   sendRadioStatsToComputer();
@@ -143,6 +170,11 @@ void loop() {
 
 void updateRadioStatus()
 {
+  static bool turnOffLedInNextLoop = false;
+  if (turnOffLedInNextLoop) {
+    turnOffLedInNextLoop = false;
+    ledOff();
+  }
   if (radioEvent) {
     radioEvent = false;
     // get irq status
@@ -158,7 +190,9 @@ void updateRadioStatus()
     if (irq & RADIOLIB_SX126X_IRQ_HEADER_VALID)
     {
       ledOn();
-      delay(1);
+      turnOffLedInNextLoop = true;
+      radioStatus.hasReceivedLoRaMessage = true;
+      radioStatus.lastReceivedLoRaMessageTime = millis();
     }
 
     // RX is done for RX_DONE, CRC_ERR, HEADER_ERR, TIMEOUT
@@ -168,9 +202,9 @@ void updateRadioStatus()
               (irq & RADIOLIB_SX126X_IRQ_TIMEOUT))
     {
       if ((irq & RADIOLIB_SX126X_IRQ_CRC_ERR) ||
-           (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { rxErrors++; }
+           (irq & RADIOLIB_SX126X_IRQ_HEADER_ERR)) { radioStatus.rxErrors++; }
       radioStatus.RXdone = true;
-      ledOff();
+      turnOffLedInNextLoop = true;
     }
   }
 }
@@ -178,11 +212,18 @@ void updateRadioStatus()
 void readInternalGPSPos()
 {
   while (Serial1.available() > 0)
+  {
+    radioStatus.hasGNSSModule = true;
     gpsInternal.encode(Serial1.read());
+  }
 }
 
 void sendInternalGPSPos()
 {
+  if (!radioStatus.hasGNSSModule) {
+    return; // no GNSS module, nothing to send
+  }
+
   static unsigned long lastSend = 0;
 
   if (millis() - lastSend < TX_INTERVAL_MS) {
@@ -199,6 +240,10 @@ void sendInternalGPSPos()
 
 void sendInternalGPSToComputer()
 {
+  if (!radioStatus.hasGNSSModule) {
+    return; // no GNSS module, nothing to send
+  }
+
   static unsigned long lastSend = 0;
 
   if (millis() - lastSend < TX_GNSS_TO_COMPUTER_INTERVAL_MS) {
@@ -226,23 +271,56 @@ void sendRadioStatsToComputer()
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
 
-  float rssi = radio.getRSSI(true);
-  float snr = radio.getSNR();
-  float noise = rssi - snr;
+  float rssi = radioStatus.rssi_last_msg;
+  float noise = radioStatus.noise_level;
+  float weird_noise = radioStatus.rssi_last_msg - radioStatus.snr_last_msg;
+
+  // Serial.printf("\nRSSI: %.2f, Noise: %.2f, WeirdNoise: %.2f\n", rssi, noise, weird_noise);
+  // Serial.printf("SNR: %.2f  True SNR: %.2f\n", radioStatus.snr_last_msg, rssi - noise);
 
   if (rssi < -200) rssi = -200;
   if (noise < -200) noise = -200;
+  if (weird_noise < -200) weird_noise = -200;
   if (rssi > 55) rssi = 55;
   if (noise > 55) noise = 55;
+  if (weird_noise > 55) weird_noise = 55;
 
   // convert rssi and noise to 0-255 range by adding 200
   uint8_t rssiByte = (uint8_t)(rssi + 200);
   uint8_t noiseByte = (uint8_t)(noise + 200);
+  uint8_t weirdNoiseByte = (uint8_t)(weird_noise + 200);
 
-  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, rxErrors, 0);
   uint8_t txBuffer[300];
+  // reliable rssi and link quality stats
+  mavlink_msg_radio_status_pack(1, 221, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), weirdNoiseByte, 0, radioStatus.rxErrors, 0);
   uint16_t len = mavlink_msg_to_send_buffer(txBuffer, &msg);
   sendBytesToComputer(txBuffer, len);
+  
+  if (radioStatus.mode == RadioMode::TRANSMITTER) {
+    return; // in transmitter mode we don't listen to the ether, so we don't know what is in there
+  }
+  // estimated, randomly tried noise floor value
+  mavlink_msg_radio_status_pack(1, 222, &msg, rssiByte, 0, (uint8_t)loraQueue.getFillPercentage(), noiseByte, 0, radioStatus.rxErrors, 0);
+  len = mavlink_msg_to_send_buffer(txBuffer, &msg);
+  sendBytesToComputer(txBuffer, len);
+}
+
+void readNoise()
+{
+  static unsigned long lastRead = 0;
+
+  if (millis() - lastRead < READ_NOISE_INTERVAL_MS) {
+    return; // not time to read yet
+  }
+  lastRead = millis();
+  
+  float noiseCandidate = radio.getRSSI(false);
+  if (noiseCandidate < radioStatus.rssi_last_msg - radioStatus.snr_last_msg - 3.0) {
+    radioStatus.noise_level = noiseCandidate;
+  }
+  else if (radioStatus.snr_last_msg < 6.0) {
+    radioStatus.noise_level = radioStatus.rssi_last_msg - radioStatus.snr_last_msg;
+  }
 }
 
 void readMavlinkUART()
@@ -292,6 +370,9 @@ void readRadioTransmission()
     // finish reception
     radioStatus.RXreceiving = false;
     radio.finishReceive();
+
+    radioStatus.rssi_last_msg = radio.getRSSI(true);
+    radioStatus.snr_last_msg = radio.getSNR();
 
     byte data[300];
     int numBytes = radio.getPacketLength();
