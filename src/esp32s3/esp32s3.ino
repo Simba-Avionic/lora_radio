@@ -44,7 +44,9 @@
 LoRaQueue loraQueue;
 WebServer webServer(80);
 
-mavlink_simba_gps_t loraRxGps = {};
+mavlink_simba_gps_t loraRxRocketGps = {};
+mavlink_simba_gps_t loraRxGSGps = {};
+
 bool loraRxValid = false;
 unsigned long loraRxLastUpdateMs = 0;
 
@@ -426,7 +428,12 @@ void readRadioTransmission()
         for (int i = 0; i < numBytes; i++) {
           if (mavlink_parse_char(MAVLINK_COMM_1, data[i], &rxMsg, &rxStatus)) {
             if (rxMsg.msgid == MAVLINK_MSG_ID_SIMBA_GPS) {
-              mavlink_msg_simba_gps_decode(&rxMsg, &loraRxGps);
+              if (rxMsg.sysid == 1 && rxMsg.compid == 200){
+                mavlink_msg_simba_gps_decode(&rxMsg, &loraRxRocketGps);
+              }
+              else {
+                mavlink_msg_simba_gps_decode(&rxMsg, &loraRxGSGps);
+              } 
               loraRxValid = true;
               loraRxLastUpdateMs = millis();
             }
@@ -479,28 +486,43 @@ void handleWebRoot()
 {
   String html = F("<!DOCTYPE html><html><head>"
     "<meta charset='utf-8'>"
-    "<meta http-equiv='refresh' content='");
-  html += WEB_REFRESH_SEC;
-  html += F("'><title>LoRa GPS</title>"
+    "<title>LoRa GPS</title>"
     "<style>body{font-family:monospace;max-width:620px;margin:40px auto;padding:0 16px}"
     "h2{margin-bottom:4px}table{border-collapse:collapse;width:100%}"
     "td{padding:6px 10px;border:1px solid #ccc}th{padding:6px 10px;background:#eee;border:1px solid #ccc}"
     "a{color:#1a73e8}.stale{color:#999}</style>"
+    "<script>setInterval(function(){window.location='/';},");
+  html += (WEB_REFRESH_SEC * 1000);
+  html += F(");</script>"
     "</head><body>"
     "<h2>LoRa GPS Tracker</h2>");
 
   html += F("<h3>Rocket (LoRa RX)</h3>");
   if (loraRxValid) {
-    unsigned long ageSec = (millis() - loraRxLastUpdateMs) / 1000UL;
-    double lat = loraRxGps.lat / 1e7;
-    double lon = loraRxGps.lon / 1e7;
-    float  alt = loraRxGps.altitude / 100.0f;
-    String cls = (ageSec > WEB_REFRESH_SEC) ? " class='stale'" : "";
-    html += "<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th><th>Age</th></tr><tr" + cls + ">";
+    double lat = loraRxRocketGps.lat / 1e7;
+    double lon = loraRxRocketGps.lon / 1e7;
+    float  alt = loraRxRocketGps.altitude / 100.0f;
+    html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
     html += "<td>" + String(lat, 7) + "</td>";
     html += "<td>" + String(lon, 7) + "</td>";
-    html += "<td>" + String(alt, 1) + "</td>";
-    html += "<td>" + String(ageSec) + " s</td></tr></table>";
+    html += "<td>" + String(alt, 1) + "</td></tr></table>";
+    html += "<p><a href='https://maps.google.com/?q=" +
+            String(lat, 7) + "," + String(lon, 7) +
+            "' target='_blank'>Open in Google Maps</a></p>";
+  } else {
+    html += F("<p class='stale'>No data received yet.</p>");
+  }
+
+  html += F("<hr>");
+  html += F("<h3>Ground Station (LoRa RX)</h3>");
+  if (loraRxValid) {
+    double lat = loraRxGSGps.lat / 1e7;
+    double lon = loraRxGSGps.lon / 1e7;
+    float  alt = loraRxGSGps.altitude / 100.0f;
+    html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
+    html += "<td>" + String(lat, 7) + "</td>";
+    html += "<td>" + String(lon, 7) + "</td>";
+    html += "<td>" + String(alt, 1) + "</td></tr></table>";
     html += "<p><a href='https://maps.google.com/?q=" +
             String(lat, 7) + "," + String(lon, 7) +
             "' target='_blank'>Open in Google Maps</a></p>";
