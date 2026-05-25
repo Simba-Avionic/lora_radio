@@ -11,6 +11,7 @@
 
 #define MODE_RECEIVER     0
 #define MODE_TRANSMITTER  1
+#define MODE_TRANSCEIVER  2
 #define MODULE_MODE       MODE_RECEIVER
 
 #define LORA_NSS   41
@@ -27,6 +28,7 @@
 #define MAV_TX     1
 
 #define TX_INTERVAL_MS 2000UL
+#define TX_INTERVAL_TRANSCEIVER_MS 5000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
 #define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000
 #define READ_NOISE_INTERVAL_MS 50UL
@@ -36,7 +38,7 @@
 
 #define WIFI_AP_SSID "LoRa-GPS"
 #define WIFI_AP_PASS "simba1234"
-#define WIFI_AP_IP   "192.168.4.1"
+#define WIFI_AP_IP   "192.168.10.131"
 #define WEB_REFRESH_SEC 10
 
 LoRaQueue loraQueue;
@@ -138,16 +140,18 @@ void setup() {
     while (true);
   }
 
-  IPAddress ip, gateway, subnet;
-  ip.fromString(WIFI_AP_IP);
-  gateway.fromString(WIFI_AP_IP);
-  subnet.fromString("255.255.255.0");
-  WiFi.softAPConfig(ip, gateway, subnet);
-  WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
-  Serial.printf("[INIT] WiFi AP: %s  IP: %s\n", WIFI_AP_SSID, WIFI_AP_IP);
+  if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+    IPAddress ip, gateway, subnet;
+    ip.fromString(WIFI_AP_IP);
+    gateway.fromString(WIFI_AP_IP);
+    subnet.fromString("255.255.255.0");
+    WiFi.softAPConfig(ip, gateway, subnet);
+    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
+    Serial.printf("[INIT] WiFi AP: %s  IP: %s\n", WIFI_AP_SSID, WIFI_AP_IP);
 
-  webServer.on("/", handleWebRoot);
-  webServer.begin();
+    webServer.on("/", handleWebRoot);
+    webServer.begin();
+  }
 }
 
 void loop() {
@@ -185,7 +189,9 @@ void loop() {
   // send link stats to Serial once in a while
   sendRadioStatsToComputer();
 
-  webServer.handleClient();
+  if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+    webServer.handleClient();
+  }
 
   // count delay and imply a delay so it is a LOOP_DELAY_MS delay between the start of each loop iteration
   unsigned long loopDuration = millis() - loopStart;
@@ -252,9 +258,13 @@ void sendInternalGPSPos()
 
   static unsigned long lastSend = 0;
 
-  if (millis() - lastSend < TX_INTERVAL_MS) {
+  unsigned long interval = (radioStatus.mode == RadioMode::TRANSCEIVER)
+                             ? TX_INTERVAL_TRANSCEIVER_MS
+                             : TX_INTERVAL_MS;
+  if (millis() - lastSend < interval) {
     return; // not time to send yet
   }
+
   lastSend = millis();
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
@@ -409,15 +419,17 @@ void readRadioTransmission()
       // send bytes to the computer
       sendBytesToComputer(data, numBytes);
 
-      // parse for SIMBA_GPS to update the web page
-      static mavlink_message_t rxMsg;
-      static mavlink_status_t  rxStatus;
-      for (int i = 0; i < numBytes; i++) {
-        if (mavlink_parse_char(MAVLINK_COMM_1, data[i], &rxMsg, &rxStatus)) {
-          if (rxMsg.msgid == MAVLINK_MSG_ID_SIMBA_GPS) {
-            mavlink_msg_simba_gps_decode(&rxMsg, &loraRxGps);
-            loraRxValid = true;
-            loraRxLastUpdateMs = millis();
+      // parse for SIMBA_GPS to update the web page (transceiver only)
+      if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+        static mavlink_message_t rxMsg;
+        static mavlink_status_t  rxStatus;
+        for (int i = 0; i < numBytes; i++) {
+          if (mavlink_parse_char(MAVLINK_COMM_1, data[i], &rxMsg, &rxStatus)) {
+            if (rxMsg.msgid == MAVLINK_MSG_ID_SIMBA_GPS) {
+              mavlink_msg_simba_gps_decode(&rxMsg, &loraRxGps);
+              loraRxValid = true;
+              loraRxLastUpdateMs = millis();
+            }
           }
         }
       }
@@ -483,7 +495,7 @@ void handleWebRoot()
     double lat = loraRxGps.lat / 1e7;
     double lon = loraRxGps.lon / 1e7;
     float  alt = loraRxGps.altitude / 100.0f;
-    String cls = (ageSec > 10) ? " class='stale'" : "";
+    String cls = (ageSec > WEB_REFRESH_SEC) ? " class='stale'" : "";
     html += "<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th><th>Age</th></tr><tr" + cls + ">";
     html += "<td>" + String(lat, 7) + "</td>";
     html += "<td>" + String(lon, 7) + "</td>";
