@@ -501,7 +501,7 @@ void handleWebRoot()
     double lat = loraRxRocketGps.lat / 1e7;
     double lon = loraRxRocketGps.lon / 1e7;
     float  alt = loraRxRocketGps.altitude / 100.0f;
-    html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
+    html += F("<table><tr><th>Lat</th><th>Lon</th></tr><tr>");
     html += "<td>" + String(lat, 7) + "</td>";
     html += "<td>" + String(lon, 7) + "</td>";
     html += "<td>" + String(alt, 1) + "</td></tr></table>";
