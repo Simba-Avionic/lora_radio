@@ -93,6 +93,22 @@ void sendRadioStatus(float rssi_dbm, float snr_db) {
   Serial.write(buf, len);
 }
 
+void sendSimbaMaxAltitude(uint8_t compid, float max_alt_m) {
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  int32_t alt_cm = (int32_t)(max_alt_m * 100.0f);
+
+  mavlink_msg_simba_max_altitude_pack(
+    MAV_SYS_ID, compid, &msg,
+    alt_cm
+  );
+  msg.seq = mavSeq++;
+
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial.write(buf, len);
+}
+
 // ----------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
@@ -164,6 +180,22 @@ void loop() {
   // GPS komputera pokładowego
   if (pkt.status & 0x02)
     sendSimbaGps(MAV_COMP_MAV_GPS, pkt.mav_lat, pkt.mav_lon, pkt.mav_alt);
+
+  float current_max_alt = -9999.0f; 
+  uint8_t target_compid = MAV_COMP_INT_GPS;
+
+  if (pkt.status & 0x01) {
+    current_max_alt = pkt.int_alt;
+  }
+  if ((pkt.status & 0x02) && (pkt.mav_alt > current_max_alt)) {
+    current_max_alt = pkt.mav_alt;
+    target_compid = MAV_COMP_MAV_GPS;
+  }
+
+  // Jeśli odebraliśmy jakąkolwiek poprawną wysokość, wysyłamy ramkę SIMBA_MAX_ALTITUDE
+  if (pkt.status & 0x03) { 
+    sendSimbaMaxAltitude(target_compid, current_max_alt);
+  }
 
   // Status łącza 
   sendRadioStatus(rssi, snr);
