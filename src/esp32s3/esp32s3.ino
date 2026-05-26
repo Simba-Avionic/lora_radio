@@ -41,11 +41,13 @@
 #define WIFI_AP_IP   "192.168.10.131"
 #define WEB_REFRESH_SEC 10
 
+#define LAT_BUNKER 35.346444
+#define LON_BUNKER -117.808194
+
 LoRaQueue loraQueue;
 WebServer webServer(80);
 
 mavlink_simba_gps_t loraRxRocketGps = {};
-mavlink_simba_gps_t loraRxGSGps = {};
 
 bool loraRxValid = false;
 unsigned long loraRxLastUpdateMs = 0;
@@ -431,9 +433,6 @@ void readRadioTransmission()
               if (rxMsg.sysid == 1 && rxMsg.compid == 200){
                 mavlink_msg_simba_gps_decode(&rxMsg, &loraRxRocketGps);
               }
-              else {
-                mavlink_msg_simba_gps_decode(&rxMsg, &loraRxGSGps);
-              } 
               loraRxValid = true;
               loraRxLastUpdateMs = millis();
             }
@@ -514,21 +513,13 @@ void handleWebRoot()
   }
 
   html += F("<hr>");
-  html += F("<h3>Ground Station (LoRa RX)</h3>");
-  if (loraRxValid) {
-    double lat = loraRxGSGps.lat / 1e7;
-    double lon = loraRxGSGps.lon / 1e7;
-    float  alt = loraRxGSGps.altitude / 100.0f;
-    html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
-    html += "<td>" + String(lat, 7) + "</td>";
-    html += "<td>" + String(lon, 7) + "</td>";
-    html += "<td>" + String(alt, 1) + "</td></tr></table>";
-    html += "<p><a href='https://maps.google.com/?q=" +
-            String(lat, 7) + "," + String(lon, 7) +
-            "' target='_blank'>Open in Google Maps</a></p>";
-  } else {
-    html += F("<p class='stale'>No data received yet.</p>");
-  }
+  html += F("<h3>Ground Station (bunker)</h3>");
+  html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
+  html += "<td>" + String(LAT_BUNKER, 7) + "</td>";
+  html += "<td>" + String(LON_BUNKER, 7) + "</td></tr></table>";
+  html += "<p><a href='https://maps.google.com/?q=" +
+          String(LAT_BUNKER, 7) + "," + String(LON_BUNKER, 7) +
+          "' target='_blank'>Open in Google Maps</a></p>";
 
   html += F("<p style='color:#999;font-size:0.85em'>Refreshes every ");
   html += WEB_REFRESH_SEC;
