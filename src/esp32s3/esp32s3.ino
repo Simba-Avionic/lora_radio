@@ -2,13 +2,15 @@
 #include <RadioLib.h>     // from RadioLib by Jan Gromes v7.6.0
 #include <TinyGPS++.h>    // from TinyGPSPlus by Mikal Hart v1.0.3
 #include "simba_headers/simba/mavlink.h" // generated from simba.xml
-
+#include <WiFi.h>         // from the ESP32 Arduino framework
+#include <WebServer.h>    // from the ESP32 Arduino framework
 #include "LoRaQueue.hpp"
 
 #define DEBUG
 
 #define MODE_RECEIVER     0
 #define MODE_TRANSMITTER  1
+#define MODE_TRANSCEIVER  2
 #define MODULE_MODE       MODE_RECEIVER
 
 #define LORA_NSS   41
@@ -25,6 +27,7 @@
 #define MAV_TX     1
 
 #define TX_INTERVAL_MS 2000UL
+#define TX_INTERVAL_TRANSCEIVER_MS 5000UL
 #define TX_GNSS_TO_COMPUTER_INTERVAL_MS 1000UL
 #define TX_RADIO_STATS_TO_COMPUTER_INTERVAL_MS 1000
 #define READ_NOISE_INTERVAL_MS 50UL
@@ -32,7 +35,21 @@
 
 #define UART_RING_BUFFER_SIZE 8096 // zabezpieczenie przed burstami danych
 
+#define WIFI_AP_SSID "LoRa-GPS"
+#define WIFI_AP_PASS "simba1234"
+#define WIFI_AP_IP   "192.168.10.131"
+#define WEB_REFRESH_SEC 10
+
+#define LAT_SETUP_AREA 35.342322
+#define LON_SETUP_AREA -117.825152
+
 LoRaQueue loraQueue;
+WebServer webServer(80);
+
+mavlink_simba_gps_t loraRxRocketGps = {};
+
+bool loraRxValid = false;
+unsigned long loraRxLastUpdateMs = 0;
 
 SPIClass spiLora(HSPI);
 SX1262   radio = new Module(LORA_NSS, LORA_DIO1, LORA_RESET, LORA_BUSY, spiLora);
@@ -54,6 +71,7 @@ void readNoise();
 void readMavlinkUART();
 
 void sendBytesToComputer(uint8_t* data, size_t length);
+void handleWebRoot();
 
 volatile bool radioEvent = false;
 void radioEventCallback() {
@@ -124,6 +142,19 @@ void setup() {
     Serial.printf("[INIT] BLAD LoRa: %d\n", state);
     while (true);
   }
+
+  if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+    IPAddress ip, gateway, subnet;
+    ip.fromString(WIFI_AP_IP);
+    gateway.fromString(WIFI_AP_IP);
+    subnet.fromString("255.255.255.0");
+    WiFi.softAPConfig(ip, gateway, subnet);
+    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
+    Serial.printf("[INIT] WiFi AP: %s  IP: %s\n", WIFI_AP_SSID, WIFI_AP_IP);
+
+    webServer.on("/", handleWebRoot);
+    webServer.begin();
+  }
 }
 
 void loop() {
@@ -160,6 +191,10 @@ void loop() {
 
   // send link stats to Serial once in a while
   sendRadioStatsToComputer();
+
+  if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+    webServer.handleClient();
+  }
 
   // count delay and imply a delay so it is a LOOP_DELAY_MS delay between the start of each loop iteration
   unsigned long loopDuration = millis() - loopStart;
@@ -226,9 +261,13 @@ void sendInternalGPSPos()
 
   static unsigned long lastSend = 0;
 
-  if (millis() - lastSend < TX_INTERVAL_MS) {
+  unsigned long interval = (radioStatus.mode == RadioMode::TRANSCEIVER)
+                             ? TX_INTERVAL_TRANSCEIVER_MS
+                             : TX_INTERVAL_MS;
+  if (millis() - lastSend < interval) {
     return; // not time to send yet
   }
+
   lastSend = millis();
   static mavlink_message_t msg;
   static mavlink_status_t mav_status;
@@ -382,6 +421,23 @@ void readRadioTransmission()
       // no errors
       // send bytes to the computer
       sendBytesToComputer(data, numBytes);
+
+      // parse for SIMBA_GPS to update the web page (transceiver only)
+      if (radioStatus.mode == RadioMode::TRANSCEIVER) {
+        static mavlink_message_t rxMsg;
+        static mavlink_status_t  rxStatus;
+        for (int i = 0; i < numBytes; i++) {
+          if (mavlink_parse_char(MAVLINK_COMM_1, data[i], &rxMsg, &rxStatus)) {
+            if (rxMsg.msgid == MAVLINK_MSG_ID_SIMBA_GPS) {
+              if (rxMsg.sysid == 1 && rxMsg.compid == 200){
+                mavlink_msg_simba_gps_decode(&rxMsg, &loraRxRocketGps);
+              }
+              loraRxValid = true;
+              loraRxLastUpdateMs = millis();
+            }
+          }
+        }
+      }
     }
   }
 
@@ -422,4 +478,50 @@ void sendBytesToComputer(uint8_t* data, size_t length)
   Serial.write(data, length);
   // also the mavlink serial      (rocket)
   SerialMAV.write(data, length);
+}
+
+void handleWebRoot()
+{
+  String html = F("<!DOCTYPE html><html><head>"
+    "<meta charset='utf-8'>"
+    "<title>LoRa GPS</title>"
+    "<style>body{font-family:monospace;max-width:620px;margin:40px auto;padding:0 16px}"
+    "h2{margin-bottom:4px}table{border-collapse:collapse;width:100%}"
+    "td{padding:6px 10px;border:1px solid #ccc}th{padding:6px 10px;background:#eee;border:1px solid #ccc}"
+    "a{color:#1a73e8}.stale{color:#999}</style>"
+    "<script>setInterval(function(){window.location='/';},");
+  html += (WEB_REFRESH_SEC * 1000);
+  html += F(");</script>"
+    "</head><body>"
+    "<h2>LoRa GPS Tracker</h2>");
+
+  html += F("<h3>Rocket (LoRa RX)</h3>");
+  if (loraRxValid) {
+    double lat = loraRxRocketGps.lat / 1e7;
+    double lon = loraRxRocketGps.lon / 1e7;
+    float  alt = loraRxRocketGps.altitude / 100.0f;
+    html += F("<table><tr><th>Lat</th><th>Lon</th></tr><tr>");
+    html += "<td>" + String(lat, 7) + "</td>";
+    html += "<td>" + String(lon, 7) + "</td>";
+    html += "<td>" + String(alt, 1) + "</td></tr></table>";
+    html += "<p><a href='https://maps.google.com/?q=" +
+            String(lat, 7) + "," + String(lon, 7) +
+            "' target='_blank'>Open in Google Maps</a></p>";
+  } else {
+    html += F("<p class='stale'>No data received yet.</p>");
+  }
+
+  html += F("<hr>");
+  html += F("<h3>Setup area)</h3>");
+  html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
+  html += "<td>" + String(LAT_SETUP_AREA, 7) + "</td>";
+  html += "<td>" + String(LON_SETUP_AREA, 7) + "</td></tr></table>";
+  html += "<p><a href='https://maps.google.com/?q=" +
+          String(LAT_SETUP_AREA, 7) + "," + String(LON_SETUP_AREA, 7) +
+          "' target='_blank'>Open in Google Maps</a></p>";
+
+  html += F("<p style='color:#999;font-size:0.85em'>Refreshes every ");
+  html += WEB_REFRESH_SEC;
+  html += F(" s</p></body></html>");
+  webServer.send(200, "text/html", html);
 }
