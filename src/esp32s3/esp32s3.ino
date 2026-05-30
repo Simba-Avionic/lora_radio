@@ -2,9 +2,8 @@
 #include <RadioLib.h>     // from RadioLib by Jan Gromes v7.6.0
 #include <TinyGPS++.h>    // from TinyGPSPlus by Mikal Hart v1.0.3
 #include "simba_headers/simba/mavlink.h" // generated from simba.xml
-#include <WiFi.h>
-#include <WebServer.h>
-
+#include <WiFi.h>         // from the ESP32 Arduino framework
+#include <WebServer.h>    // from the ESP32 Arduino framework
 #include "LoRaQueue.hpp"
 
 #define DEBUG
@@ -41,8 +40,8 @@
 #define WIFI_AP_IP   "192.168.10.131"
 #define WEB_REFRESH_SEC 10
 
-#define LAT_BUNKER 35.346444
-#define LON_BUNKER -117.808194
+#define LAT_SETUP_AREA 35.342322
+#define LON_SETUP_AREA -117.825152
 
 LoRaQueue loraQueue;
 WebServer webServer(80);
@@ -513,12 +512,12 @@ void handleWebRoot()
   }
 
   html += F("<hr>");
-  html += F("<h3>Ground Station (bunker)</h3>");
+  html += F("<h3>Setup area)</h3>");
   html += F("<table><tr><th>Lat</th><th>Lon</th><th>Alt (m)</th></tr><tr>");
-  html += "<td>" + String(LAT_BUNKER, 7) + "</td>";
-  html += "<td>" + String(LON_BUNKER, 7) + "</td></tr></table>";
+  html += "<td>" + String(LAT_SETUP_AREA, 7) + "</td>";
+  html += "<td>" + String(LON_SETUP_AREA, 7) + "</td></tr></table>";
   html += "<p><a href='https://maps.google.com/?q=" +
-          String(LAT_BUNKER, 7) + "," + String(LON_BUNKER, 7) +
+          String(LAT_SETUP_AREA, 7) + "," + String(LON_SETUP_AREA, 7) +
           "' target='_blank'>Open in Google Maps</a></p>";
 
   html += F("<p style='color:#999;font-size:0.85em'>Refreshes every ");
