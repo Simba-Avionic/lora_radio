@@ -1,14 +1,24 @@
 # simple ROS2 node to test my definied msg from "lora_ros_msgs" package
-
-from lora_ros_msgs.msg import GpsShort, LoraStatus, LoraGnss
+import os
+import sys
+from lora_ros_msgs.msg import GpsShort, LoraStatus, LoraGnss, MaxAltitude
 
 # import threads
 import threading
 
 # import mavlink (simba_mavlink dialect)
 from pymavlink import mavutil
-import simba_mavlink
-mavutil.mavlink = simba_mavlink
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+sys.path.append(PROJECT_ROOT)
+sys.path.append(os.path.join(PROJECT_ROOT, "mavlink"))
+
+try:
+    import mavlink.src.simba as simba_dialect  # Generated dialect
+except:
+    print("Failed to import simba dialect.")
+mavutil.mavlink = simba_dialect
 
 import rclpy
 from rclpy.node import Node
@@ -20,9 +30,11 @@ class LoRaNode(Node):
         super().__init__('lora_node')
         self.publisher_lora_gps = self.create_publisher(GpsShort, '/rocket/lora/gps', 10)
         self.publisher_rocket_gps = self.create_publisher(GpsShort, '/rocket/gps', 10)
+        self.publisher_recovery_gps = self.create_publisher(GpsShort, '/recovery/gps', 10)
         self.publisher_lora_status = self.create_publisher(LoraStatus, '/mission_control/lora/status', 10)
         self.publisher_lora_extra_status = self.create_publisher(LoraStatus, '/mission_control/lora/extra_status', 10)
         self.publisher_lora_gnss = self.create_publisher(LoraGnss, '/mission_control/lora/gnss', 10)
+        self.publisher_max_alt = self.create_publisher(MaxAltitude, 'mavlink/simba_max_altitude', 10)
         self.mavlink_connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=57600)
 
         self.r_thread = threading.Thread(target=self.reading_thread)
@@ -96,6 +108,17 @@ class LoRaNode(Node):
                     elif msg.get_srcComponent() == 200: # GPS from rocket GNSS
                         ros_msg.header.frame_id = '/rocket/gps'
                         self.publisher_rocket_gps.publish(ros_msg)
+                    elif msg.get_srcComponent() == 222:
+                        ros_msg.header.frame_id = '/recovery/gps'
+                        self.publisher_recovery_gps.publish(ros_msg)
+
+                    
+                elif msg.get_type() == 'SIMBA_MAX_ALTITUDE':
+                    ros_msg = MaxAltitude()
+                    ros_msg.header.stamp = self.get_clock().now().to_msg()
+                    ros_msg.altitude = msg.altitude
+                    ros_msg.header.frame_id = 'mavlink/max_altitude'
+                    self.publisher_max_alt.publish(ros_msg)
 
                     # self.get_logger().info(f'Published GPS: {ros_msg}')
                 
